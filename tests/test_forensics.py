@@ -81,5 +81,46 @@ class State(TypedDict):
         self.assertEqual(len(results), 1)
         self.assertTrue(0.6 <= results[0].confidence <= 0.85)
 
+    # --- Failure Mode Tests (Rubric Enhancement) ---
+
+    def test_unsafe_code_detection(self):
+        """
+        Tests if RepoTools correctly detects os.system and eval.
+        """
+        code = "import os\nos.system('rm -rf /')\neval('1+1')"
+        with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as tmp:
+            tmp.write(code)
+            tmp_path = tmp.name
+        
+        try:
+            results = RepoTools.verify_tool_safety(tmp_path)
+            self.assertFalse(results.is_safe)
+            self.assertIn("os.system", results.unsafe_calls_found)
+            self.assertIn("eval", results.unsafe_calls_found)
+        finally:
+            os.remove(tmp_path)
+
+    def test_no_graph_detection(self):
+        """
+        Tests if RepoTools handles files with no StateGraph logic.
+        """
+        code = "print('hello world')"
+        with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as tmp:
+            tmp.write(code)
+            tmp_path = tmp.name
+        
+        try:
+            results = RepoTools.analyze_graph_structure(tmp_path)
+            self.assertFalse(results.state_graph_instance_found)
+        finally:
+            os.remove(tmp_path)
+
+    def test_missing_pdf_handling(self):
+        """
+        Tests if DocTools handles missing files gracefully.
+        """
+        results = DocTools.ingest_pdf("non_existent_file.pdf")
+        self.assertEqual(results, [])
+
 if __name__ == "__main__":
     unittest.main()

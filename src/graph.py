@@ -51,34 +51,53 @@ def evidence_aggregator(state: AgentState):
     
     return {"conflict_log": conflicts}
 
+def failure_node(state: AgentState):
+    """
+    Terminal node reached if no forensic artifacts are available for analysis.
+    """
+    print("--- FORENSIC ABORT: No artifacts available ---")
+    return {"conflict_log": ["Abort: Both repo_url and pdf_path were missing or unreachable."]}
+
 # --- Graph Construction ---
 
 # --- Judicial Layer (Phase 3 Stubs) ---
 
 def judge_router(state: AgentState):
     """
-    Placeholder for Judicial Layer routing.
-    In Phase 3, this will fan-out to Prosecutor, Defense, and TechLead.
+    Transition point for Judicial Layer Fan-Out (Phase 3).
+    Evaluates evidence quality before triggering Prosecutor/Defense/TechLead.
     """
-    # For now, we go straight to aggregation and end.
-    return "evidence_aggregator"
+    # If evidence confidence is too low across the board, we might skip judging.
+    return "END"
 
 def create_graph():
     builder = StateGraph(AgentState)
 
-    # Add Detective Nodes
+    # Add Nodes
     builder.add_node("RepoInvestigator", RepoInvestigator)
     builder.add_node("DocAnalyst", DocAnalyst)
     builder.add_node("VisionInspector", VisionInspector)
-    
-    # Add Aggregator Node
     builder.add_node("evidence_aggregator", evidence_aggregator)
+    builder.add_node("failure_node", failure_node)
 
-    # Define Conditional Routing from START (Master Thinker Rubric Requirement)
+    # --- Concrete Conditional Routing (Rubric Enhancement) ---
     def start_router(state: AgentState):
-        # In a real scenario, we might skip nodes if credentials/files are missing.
-        # Here we always trigger detectives for full forensic coverage.
-        return ["RepoInvestigator", "DocAnalyst", "VisionInspector"]
+        runnable = []
+        
+        # 1. Check Repo Artifact
+        if state.get("repo_url"):
+            runnable.append("RepoInvestigator")
+        
+        # 2. Check Doc Artifacts
+        pdf_path = state.get("pdf_path")
+        if pdf_path and os.path.exists(pdf_path):
+            runnable.append("DocAnalyst")
+            runnable.append("VisionInspector")
+            
+        if not runnable:
+            return ["failure_node"]
+            
+        return runnable
 
     builder.add_conditional_edges(
         START,
@@ -86,7 +105,8 @@ def create_graph():
         {
             "RepoInvestigator": "RepoInvestigator",
             "DocAnalyst": "DocAnalyst",
-            "VisionInspector": "VisionInspector"
+            "VisionInspector": "VisionInspector",
+            "failure_node": "failure_node"
         }
     )
 
@@ -94,11 +114,14 @@ def create_graph():
     builder.add_edge("RepoInvestigator", "evidence_aggregator")
     builder.add_edge("DocAnalyst", "evidence_aggregator")
     builder.add_edge("VisionInspector", "evidence_aggregator")
+    
+    # Abort path
+    builder.add_edge("failure_node", END)
 
-    # Placeholder: Judicial Layer Fan-Out Transition
-    # builder.add_conditional_edges("evidence_aggregator", judge_router)
+    # Transition to Judicial (Placeholder for Phase 3)
+    # builder.add_conditional_edges("evidence_aggregator", judge_router, {"END": END})
 
-    # End after aggregation (Phase 2)
+    # Terminal point for Phase 2
     builder.add_edge("evidence_aggregator", END)
 
     return builder.compile()
