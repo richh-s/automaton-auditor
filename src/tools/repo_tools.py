@@ -26,6 +26,10 @@ class GitForensics(BaseModel):
     development_pattern: str = "Unknown"
     commits: List[Dict[str, Any]] = []
 
+class SafetyForensics(BaseModel):
+    unsafe_calls_found: List[str] = []
+    is_safe: bool = True
+
 class RepoTools:
     @staticmethod
     def analyze_graph_structure(path: str) -> GraphForensics:
@@ -133,6 +137,41 @@ class RepoTools:
         if forensics.annotated_found and len(set(forensics.reducers_found)) >= 2:
             forensics.is_robust = True
             
+        return forensics
+
+    @staticmethod
+    def verify_tool_safety(path: str) -> SafetyForensics:
+        """
+        Scans for unsafe Python functions (os.system, eval, exec).
+        """
+        forensics = SafetyForensics()
+        unsafe_targets = {"os.system", "eval", "exec"}
+        
+        try:
+            with open(path, "r") as f:
+                tree = ast.parse(f.read())
+        except Exception:
+            return forensics
+
+        class SafetyVisitor(ast.NodeVisitor):
+            def visit_Call(self, node):
+                func_name = self._get_name(node.func)
+                if func_name in unsafe_targets:
+                    forensics.unsafe_calls_found.append(func_name)
+                    forensics.is_safe = False
+                self.generic_visit(node)
+
+            def _get_name(self, node):
+                if isinstance(node, ast.Name):
+                    return node.id
+                if isinstance(node, ast.Attribute):
+                    val = self._get_name(node.value)
+                    if val:
+                        return f"{val}.{node.attr}"
+                return None
+
+        visitor = SafetyVisitor()
+        visitor.visit(tree)
         return forensics
 
     @staticmethod

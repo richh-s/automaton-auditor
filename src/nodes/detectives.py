@@ -55,7 +55,19 @@ def RepoInvestigator(state: AgentState):
                     metadata=reducer_data.dict()
                 ))
 
-            # 4. Git History Analysis
+            # 4. Tool Safety Check
+            if os.path.exists(graph_path):
+                safety_data = RepoTools.verify_tool_safety(graph_path)
+                evidences.append(Evidence(
+                    goal="Verify Tool Safety",
+                    found=safety_data.is_safe,
+                    location="src/graph.py",
+                    rationale=f"Found unsafe calls: {safety_data.unsafe_calls_found}." if not safety_data.is_safe else "No unsafe calls (os.system, eval) detected.",
+                    confidence=1.0,
+                    metadata=safety_data.dict()
+                ))
+
+            # 5. Git History Analysis
             git_data = RepoTools.extract_git_history(tmpdir)
             evidences.append(Evidence(
                 goal="Verify Development Narrative",

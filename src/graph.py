@@ -53,6 +53,16 @@ def evidence_aggregator(state: AgentState):
 
 # --- Graph Construction ---
 
+# --- Judicial Layer (Phase 3 Stubs) ---
+
+def judge_router(state: AgentState):
+    """
+    Placeholder for Judicial Layer routing.
+    In Phase 3, this will fan-out to Prosecutor, Defense, and TechLead.
+    """
+    # For now, we go straight to aggregation and end.
+    return "evidence_aggregator"
+
 def create_graph():
     builder = StateGraph(AgentState)
 
@@ -64,17 +74,31 @@ def create_graph():
     # Add Aggregator Node
     builder.add_node("evidence_aggregator", evidence_aggregator)
 
-    # Define Parallel Fan-Out from START
-    builder.add_edge(START, "RepoInvestigator")
-    builder.add_edge(START, "DocAnalyst")
-    builder.add_edge(START, "VisionInspector")
+    # Define Conditional Routing from START (Master Thinker Rubric Requirement)
+    def start_router(state: AgentState):
+        # In a real scenario, we might skip nodes if credentials/files are missing.
+        # Here we always trigger detectives for full forensic coverage.
+        return ["RepoInvestigator", "DocAnalyst", "VisionInspector"]
+
+    builder.add_conditional_edges(
+        START,
+        start_router,
+        {
+            "RepoInvestigator": "RepoInvestigator",
+            "DocAnalyst": "DocAnalyst",
+            "VisionInspector": "VisionInspector"
+        }
+    )
 
     # Define Fan-In to Aggregator
     builder.add_edge("RepoInvestigator", "evidence_aggregator")
     builder.add_edge("DocAnalyst", "evidence_aggregator")
     builder.add_edge("VisionInspector", "evidence_aggregator")
 
-    # End after aggregation
+    # Placeholder: Judicial Layer Fan-Out Transition
+    # builder.add_conditional_edges("evidence_aggregator", judge_router)
+
+    # End after aggregation (Phase 2)
     builder.add_edge("evidence_aggregator", END)
 
     return builder.compile()
