@@ -11,4 +11,6 @@ dependencies = [
     "python-dotenv",
     "langsmith",
     "typing-extensions",
+    "pymupdf>=1.27.1",
+    "docling>=2.75.0",
 ]
