@@ -42,13 +42,20 @@ cp .env.example .env
 ## 🛠️ Usage
 
 ### Running the Forensic Graph
-To execute the detective swarm against a target repository:
+The auditor can be executed against any target repository or technical report. If no arguments are provided, it defaults to auditing its own repository.
+
 ```bash
-uv run python main.py
+# General usage
+uv run python main.py --repo <REPO_URL> --pdf <PATH_TO_PDF>
+
+# Example: Auditing an external project
+uv run python main.py \
+  --repo https://github.com/langchain-ai/langgraph \
+  --pdf docs/architecture_spec.pdf
 ```
 
 ### Running Tests
-To validate the forensic tools and orchestration logic:
+To validate the forensic tools and orchestration logic including failure mode handling:
 ```bash
 uv run python -m unittest tests/test_forensics.py
 ```
@@ -56,8 +63,9 @@ uv run python -m unittest tests/test_forensics.py
 ---
 
 ## 📂 Project Structure
-- `src/graph.py`: The LangGraph state machine orchestration.
-- `src/nodes/detectives.py`: Forensic agent implementations.
-- `src/tools/`: Specialized forensic extraction modules.
-- `reports/`: Forensic audit reports.
-- `tests/`: Forensic test suite.
+- `src/graph.py`: The architecture of the LangGraph state machine.
+- `src/state.py`: Pydantic definitions and robust reducers.
+- `src/nodes/detectives.py`: Implementation of forensic agent nodes.
+- `src/tools/`: Specialized modules for AST, PDF, and Git analysis.
+- `reports/`: Location for generated forensic audit reports.
+- `tests/`: Forensic test suite with high failure-mode coverage.
