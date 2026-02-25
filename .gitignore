@@ -1,0 +1,17 @@
+# Python Caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+venv/
+ENV/
+.env
+
+# Project specific
+FORENSIC_REPORT.md
+reports/FORENSIC_REPORT.md
+
+# OS specific
+.DS_Store
