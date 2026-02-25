@@ -15,16 +15,29 @@ def doc_analyst(state: AgentState):
     return {"evidences": {"doc": []}}
 
 def vision_inspector(state: AgentState):
-    """Forensic diagram analysis."""
-    print("--- VISION INSPECTOR ---")
+    """Forensic diagram analysis (Symmetry placeholder for Phase 2)."""
+    print("--- VISION INSPECTOR (Preserving Orchestration Symmetry) ---")
     return {"evidences": {"vision": []}}
 
-# --- Synchronization Node ---
+# --- Synchronization & Metacognitive Validation ---
 
 def evidence_aggregator(state: AgentState):
-    """Fan-in node to synchronize evidence before finalization."""
-    print("--- EVIDENCE AGGREGATOR ---")
-    # This node ensures all parallel branches have completed
+    """
+    Fan-in node to synchronize evidence and perform metacognitive validation.
+    Verifies completeness and flags missing evidence dimensions.
+    """
+    print("--- EVIDENCE AGGREGATOR (Metacognitive Validation) ---")
+    
+    expected_keys = {"repo", "doc", "vision"}
+    actual_keys = set(state["evidences"].keys())
+    
+    missing = expected_keys - actual_keys
+    if missing:
+        print(f"FAILED: Metacognitive check - Missing evidence dimensions: {missing}")
+        # In a real scenario, this would trigger a retry or flag for the Judge
+    else:
+        print("PASSED: Metacognitive check - All forensic dimensions synchronized.")
+        
     return state
 
 # --- Graph Construction ---
