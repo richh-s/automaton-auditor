@@ -2,21 +2,62 @@
 
 The **Automaton Auditor** is a production-grade multi-agent system designed for autonomous governance and quality assurance in AI-Native enterprises. It operates as a **Digital Courtroom**, utilizing a hierarchical swarm of specialized agents to perform forensic analysis, apply nuanced judgment, and provide actionable technical remediation.
 
-## 🏛️ Phase 1: Infrastructure & Orchestration (Complete)
+## 🏛️ Infrastructure & Forensic Tools
 
-Phase 1 establishes the "Constitutional" foundation of the auditor, focusing on deterministic forensic integrity and production-ready LangGraph orchestration.
+The Automaton Auditor implements a resilient and deterministic forensic architecture using a multi-agent approach.
 
 ### Key Features:
-- **Parallel Forensic Swarm**: Implements an explicit fan-out/fan-in architecture from `START` to multiple detective sub-agents.
-- **Metacognitive synchronization barrier**: The `evidence_aggregator` node audits system reliability and forensic completeness before finalization.
-- **Deterministic Forensic Mindset**: Strictly separates objective extraction (Deep AST Parsing, sandboxed clones) from probabilistic judicial reasoning.
-- **Master Thinker Concurrency**: Implements explicit identity initialization for functional reducers to ensure thread-safe, resilient state management.
-
-### Technical Stack:
-- **LangGraph**: Orchestration of the hierarchical state machine.
-- **Pydantic**: Rigid forensic schema enforcement.
-- **uv**: Reproducible environment and dependency management.
-- **LangSmith**: Real-time observability and audit trail.
+- **Parallel Forensic Swarm**: Fan-out/fan-in architecture triggering multiple detective nodes concurrently.
+- **Metacognitive synchronization barrier**: `evidence_aggregator` node audits forensic completeness before finalization.
+- **Advanced Forensic Tools**: 
+    - `RepoInvestigator`: Deep AST parsing and Git history analysis.
+    - `DocAnalyst`: Citation-preserving PDF RAG-lite retrieval.
+    - `VisionInspector`: Image extraction and layout analysis.
 
 ---
-*Developed for the Week 2 Automaton Auditor Challenge.*
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+- **Python 3.14+**
+- **uv**: The project uses `uv` for lightning-fast dependency management. [Install uv](https://github.com/astral-sh/uv).
+
+### 2. Installation
+Clone the repository and install dependencies using `uv`:
+```bash
+git clone <repo-url>
+cd automaton-auditor
+uv sync
+```
+
+### 3. Environment Setup
+Copy the example environment file and add your credentials:
+```bash
+cp .env.example .env
+```
+*Note: Forensic tools use simulated/local logic for certain LLM features but require valid LangSmith keys for full observability.*
+
+---
+
+## 🛠️ Usage
+
+### Running the Forensic Graph
+To execute the detective swarm against a target repository:
+```bash
+uv run python main.py
+```
+
+### Running Tests
+To validate the forensic tools and orchestration logic:
+```bash
+uv run python -m unittest tests/test_forensics.py
+```
+
+---
+
+## 📂 Project Structure
+- `src/graph.py`: The LangGraph state machine orchestration.
+- `src/nodes/detectives.py`: Forensic agent implementations.
+- `src/tools/`: Specialized forensic extraction modules.
+- `reports/`: Forensic audit reports.
+- `tests/`: Forensic test suite.
