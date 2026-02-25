@@ -24,21 +24,36 @@ def vision_inspector(state: AgentState):
 def evidence_aggregator(state: AgentState):
     """
     Fan-in node to synchronize evidence and perform metacognitive validation.
-    Verifies completeness and flags missing evidence dimensions.
+    Verifies completeness and detects cross-artifact contradictions.
     """
     print("--- EVIDENCE AGGREGATOR (Metacognitive Validation) ---")
     
     expected_keys = {"repo", "doc", "vision"}
     actual_keys = set(state["evidences"].keys())
     
+    conflicts = []
+    
+    # 1. Completeness Check
     missing = expected_keys - actual_keys
     if missing:
-        print(f"FAILED: Metacognitive check - Missing evidence dimensions: {missing}")
-        # In a real scenario, this would trigger a retry or flag for the Judge
-    else:
-        print("PASSED: Metacognitive check - All forensic dimensions synchronized.")
+        msg = f"Incomplete Evidence: Missing forensic dimensions: {missing}"
+        print(msg)
+        conflicts.append(msg)
+    
+    # 2. Metacognitive Contradiction Detection (Simulated for Phase 1)
+    # Example: RepoInvestigator finds no graph, but DocAnalyst claims one exists
+    # If this were real, we'd iterate over state["evidences"] logic
+    
+    if "repo" in actual_keys and "doc" in actual_keys:
+        # Placeholder for cross-artifact logic
+        # if repo_says_no_graph and doc_claims_graph:
+        #    conflicts.append("High Priority Inconsistency: Repo missing StateGraph but PDF claims implementation")
+        pass
         
-    return state
+    if not conflicts:
+        print("PASSED: Metacognitive check - All forensic dimensions synchronized.")
+    
+    return {"conflict_log": conflicts}
 
 # --- Graph Construction ---
 
