@@ -126,5 +126,20 @@ The system has been validated against common failure scenarios via automated uni
 - **Graceful PDF Ingestion**: Handles missing or corrupted documents without system crash, returning a factual `found: False` evidence object.
 - **Invalid Repo Handling**: Correctly catches `subprocess` errors for invalid Git URLs and classifies them as forensic mismatches.
 
+## 🏗️ Reproducibility & Professional Infrastructure
+
+The repository is built for seamless reproduction and technical audit.
+
+### 1. Dependency Management
+- **Toolchain**: Built with `uv` for deterministic, cross-platform dependency resolution.
+- **Locking**: Includes a `uv.lock` file ensuring every auditor runs on the exact same forensic environment (Python 3.14+).
+
+### 2. Environment Safety
+- **Granular .env.example**: Every environment variable is explicitly documented with its purpose and expected format.
+- **Zero Pollution**: No secrets are committed, and bytecode/system files are strictly excluded via `.gitignore`.
+
+### 3. Command Line Interface (CLI)
+- **Flexibility**: The system provides a clean CLI in `main.py` allowing auditors to specify arbitrary target repositories using the `--repo` and `--pdf` flags, moving away from hardcoded configurations.
+
 ---
 *Status: Architecture & Forensic Tools Finalized *
