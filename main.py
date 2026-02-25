@@ -10,6 +10,7 @@ def main():
         "rubric_dimensions": [],
         "evidences": {}, # Identity value for operator.ior
         "opinions": [],  # Identity value for operator.add
+        "conflict_log": [], # Future-proofed resolution tracking
     }
     
     print("Invoking Graph Orchestrator...")
