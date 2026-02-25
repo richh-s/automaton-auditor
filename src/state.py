@@ -20,6 +20,10 @@ class Evidence(BaseModel):
         "on the evidence you find for this particular goal",
     )
     confidence: float
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Structured forensic metadata (source_line, node_type, etc.)",
+    )
 
 
 # --- Judge Output ---
@@ -73,5 +77,8 @@ class AgentState(TypedDict):
     ]
     opinions: Annotated[
         List[JudicialOpinion], operator.add
+    ]
+    conflict_log: Annotated[
+        List[str], operator.add
     ]
     final_report: AuditReport
