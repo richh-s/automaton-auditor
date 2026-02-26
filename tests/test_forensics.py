@@ -65,7 +65,7 @@ class State(TypedDict):
         """
         results = RepoTools.extract_git_history(".")
         self.assertGreater(results.commit_count, 0)
-        self.assertIn(results.development_pattern, ["Iterative Development", "Monolithic Dump", "Single Commit Pattern"])
+        self.assertIn(results.development_pattern, ["Atomic", "Monolithic Dump", "No Commits"])
 
     def test_doc_rag_lite_confidence(self):
         """

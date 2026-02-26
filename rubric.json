@@ -1,0 +1,28 @@
+{
+  "dimensions": [
+    {
+      "id": "graph_architecture",
+      "name": "StateGraph Architecture",
+      "description": "Does the system use a robust StateGraph with multi-agent orchestration?",
+      "scoring_rule": "1: No graph. 3: Single agent. 5: Deep Swarm with parallel nodes."
+    },
+    {
+      "id": "type_safety",
+      "name": "Pydantic & Type Safety",
+      "description": "Are states typed using Pydantic and TypedDict?",
+      "scoring_rule": "1: No types. 3: Partial types. 5: Strict Pydantic enforcement throughout."
+    },
+    {
+      "id": "forensic_depth",
+      "name": "Forensic Depth",
+      "description": "Does the analysis use AST parsing and RAG-lite document analysis?",
+      "scoring_rule": "1: Regex only. 3: Basic AST. 5: Deep AST + Citation-preserving RAG."
+    },
+    {
+      "id": "narrative_continuity",
+      "name": "Development Narrative",
+      "description": "Is there a clear Git execution narrative?",
+      "scoring_rule": "1: No history. 3: Basic commits. 5: Atomic, well-structured git narrative."
+    }
+  ]
+}

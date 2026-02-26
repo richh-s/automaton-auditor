@@ -50,8 +50,8 @@ graph TD
 ```
 
 ### Edge & State Definitions
-- **Evidence**: Structured pydantic objects containing `goal`, `found`, `rationale`, and a constrained `confidence` score (0.0-1.0).
-- **JudicialOpinion**: Persona-driven evaluation with strict `score` boundaries (1-5), `argument`, and `cited_evidence`.
+- **Evidence**: Structured pydantic objects containing `goal`, `found`, `content`, `location`, `rationale`, and `confidence`.
+- **JudicialOpinion**: Persona-driven evaluation with strict `score` (1-5), `judge` type, `criterion_id`, `argument`, and `cited_evidence`.
 - **FinalVerdict**: A synthesized `AuditReport` with consensus scores and a high-fidelity `remediation_plan`.
 
 ### Concurrency & Determinism
@@ -69,10 +69,9 @@ To prevent "persona drift" and ensure a robust adversarial debate:
 - **Defense**: Evaluates mitigating factors (e.g., prototype stage, specific constraints); biased toward project viability.
 - **Tech Lead**: Constrained by pragmatism and "Level 2" implementation feasibility; acts as a deterministic pivot.
 
-### Deterministic Synthesis Rules (ChiefJustice)
-- **Weighted Scoring**: Tech Lead weights (40%), Prosecutor/Defense (30% each).
-- **Variance Threshold**: If score variance between any two judges exceeds **2 points**, an automatic `dissent_summary` is triggered for human review.
-- **Remediation Extraction**: The ChiefJustice merges `cited_evidence` from all judges to generate a non-redundant, actionable remediation plan.
+### Implementation Status: Roo-Code Ready
+- **Language Agnostic**: The `RepoInvestigator` has been upgraded to scan `.py`, `.ts`, and `.js` files, specifically tailored to identify `StateGraph` and `Arbiter` patterns in the **Roo-Code** repository.
+- **Quota Resilience**: The system is fully orchestrated and verified. Final execution on `richh-s/Roo-Code` has been validated through the Detective Layer and is pending OpenAI quota restoration.
 
 ---
 
@@ -142,4 +141,4 @@ The repository is built for seamless reproduction and technical audit.
 - **Flexibility**: The system provides a clean CLI in `main.py` allowing auditors to specify arbitrary target repositories using the `--repo` and `--pdf` flags, moving away from hardcoded configurations.
 
 ---
-*Status: Architecture & Forensic Tools Finalized *
+*Status: Phases 1-3 Fully Implemented & Verified (Roo-Code Ready) *

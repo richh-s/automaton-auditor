@@ -1,104 +1,47 @@
 from langgraph.graph import StateGraph, END, START
 from src.state import AgentState, Evidence
 from src.nodes.detectives import RepoInvestigator, DocAnalyst, VisionInspector
+from src.nodes.judges import Prosecutor, Defense, TechLead, ChiefJustice, EvidenceAggregator
 import os
-
-# --- Synchronization & Metacognitive Validation ---
-
-def evidence_aggregator(state: AgentState):
-    """
-    Fan-in node to synchronize evidence and perform deterministic arbitration.
-    AST (1.0) overrides Doc/Vision (< 0.8) claims.
-    """
-    print("--- EVIDENCE AGGREGATOR (Deterministic Arbitration) ---")
-    
-    expected_keys = {"repo", "doc", "vision"}
-    actual_keys = set(state["evidences"].keys())
-    
-    conflicts = []
-    
-    # 1. Structural Completeness Audit
-    missing = expected_keys - actual_keys
-    if missing:
-        msg = f"Incomplete Evidence: Missing forensic dimensions: {missing}"
-        conflicts.append(msg)
-    
-    # 2. Deterministic Arbitration & Conflict Logging
-    # Example: If Doc claims 'Metacognition' but Repo AST finds no StateGraph logic
-    repo_ev = state["evidences"].get("repo", [])
-    doc_ev = state["evidences"].get("doc", [])
-    vision_ev = state["evidences"].get("vision", [])
-
-    # Find the AST Parallelism evidence
-    ast_parallel = next((e for e in repo_ev if e.goal == "Verify Graph Parallelism"), None)
-    doc_claim = next((e for e in doc_ev if e.goal == "Verify Metacognitive Claims"), None)
-    
-    if ast_parallel and doc_claim:
-        # Deterministic Override: If AST says NO but Doc says YES
-        if not ast_parallel.found and doc_claim.found:
-            conflicts.append("High Severity Structural Mismatch: PDF claims complex architecture but AST shows no StateGraph.")
-        
-    # High Severity Mismatch: If both Doc and Vision contradict AST
-    vision_claim = next((e for e in vision_ev if e.goal == "Verify Architectural Diagram"), None)
-    if ast_parallel and not ast_parallel.found and doc_claim and doc_claim.found and vision_claim and vision_claim.found:
-         conflicts.append("CRITICAL: Holistic Mismatch - Multi-artifact hallucination detected (Doc & Vision claim graph, AST denies).")
-
-    if not conflicts:
-        print("PASSED: Metacognitive check - Structural audit successful.")
-    else:
-        for c in conflicts:
-            print(f"CONFLICT DETECTED: {c}")
-    
-    return {"conflict_log": conflicts}
 
 def failure_node(state: AgentState):
     """
     Terminal node reached if no forensic artifacts are available for analysis.
     """
     print("--- FORENSIC ABORT: No artifacts available ---")
-    return {"conflict_log": ["Abort: Both repo_url and pdf_path were missing or unreachable."]}
-
-# --- Graph Construction ---
-
-# --- Judicial Layer (Phase 3 Stubs) ---
-
-def judge_router(state: AgentState):
-    """
-    Transition point for Judicial Layer Fan-Out (Phase 3).
-    Evaluates evidence quality before triggering Prosecutor/Defense/TechLead.
-    """
-    # If evidence confidence is too low across the board, we might skip judging.
-    return "END"
+    return state
 
 def create_graph():
     builder = StateGraph(AgentState)
 
-    # Add Nodes
+    # Add Detective Nodes
     builder.add_node("RepoInvestigator", RepoInvestigator)
     builder.add_node("DocAnalyst", DocAnalyst)
     builder.add_node("VisionInspector", VisionInspector)
-    builder.add_node("evidence_aggregator", evidence_aggregator)
+    
+    # Add Judicial Nodes
+    builder.add_node("EvidenceAggregator", EvidenceAggregator)
+    builder.add_node("Prosecutor", Prosecutor)
+    builder.add_node("Defense", Defense)
+    builder.add_node("TechLead", TechLead)
+    builder.add_node("ChiefJustice", ChiefJustice)
+    
     builder.add_node("failure_node", failure_node)
 
-    # --- Concrete Conditional Routing (Rubric Enhancement) ---
+    # --- Router Logic ---
     def start_router(state: AgentState):
         runnable = []
-        
-        # 1. Check Repo Artifact
         if state.get("repo_url"):
             runnable.append("RepoInvestigator")
-        
-        # 2. Check Doc Artifacts
-        pdf_path = state.get("pdf_path")
-        if pdf_path and os.path.exists(pdf_path):
+        if state.get("pdf_path") and os.path.exists(state.get("pdf_path", "")):
             runnable.append("DocAnalyst")
             runnable.append("VisionInspector")
             
         if not runnable:
             return ["failure_node"]
-            
         return runnable
 
+    # 1. Start -> Detectives (Parallel)
     builder.add_conditional_edges(
         START,
         start_router,
@@ -110,19 +53,24 @@ def create_graph():
         }
     )
 
-    # Define Fan-In to Aggregator
-    builder.add_edge("RepoInvestigator", "evidence_aggregator")
-    builder.add_edge("DocAnalyst", "evidence_aggregator")
-    builder.add_edge("VisionInspector", "evidence_aggregator")
+    # 2. Detectives -> Aggregator (Fan-In)
+    builder.add_edge("RepoInvestigator", "EvidenceAggregator")
+    builder.add_edge("DocAnalyst", "EvidenceAggregator")
+    builder.add_edge("VisionInspector", "EvidenceAggregator")
     
-    # Abort path
+    # 3. Aggregator -> Judges (Fan-Out)
+    builder.add_edge("EvidenceAggregator", "Prosecutor")
+    builder.add_edge("EvidenceAggregator", "Defense")
+    builder.add_edge("EvidenceAggregator", "TechLead")
+    
+    # 4. Judges -> Chief Justice (Fan-In)
+    builder.add_edge("Prosecutor", "ChiefJustice")
+    builder.add_edge("Defense", "ChiefJustice")
+    builder.add_edge("TechLead", "ChiefJustice")
+    
+    # 5. Terminal Paths
+    builder.add_edge("ChiefJustice", END)
     builder.add_edge("failure_node", END)
-
-    # Transition to Judicial (Placeholder for Phase 3)
-    # builder.add_conditional_edges("evidence_aggregator", judge_router, {"END": END})
-
-    # Terminal point for Phase 2
-    builder.add_edge("evidence_aggregator", END)
 
     return builder.compile()
 

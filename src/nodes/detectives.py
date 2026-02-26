@@ -13,73 +13,98 @@ def RepoInvestigator(state: AgentState):
     Forensic code analysis.
     Uses Deep AST Parsing to verify structure and Git Forensics for narrative.
     """
-    print("--- REPO INVESTIGATOR (Deep AST & Git Forensics) ---")
-    repo_url = state.get("repo_url")
+    print(f"--- REPO INVESTIGATOR (Deep AST & Git Forensics) ---")
+    repo_url = state.get("repo_url", "")
     evidences = []
 
+    if not repo_url:
+         print("DEBUG: No repo URL provided.")
+         return {"evidences": {"repo": [Evidence(
+                goal="Environment Clone",
+                found=False,
+                location="None",
+                rationale="No repository URL provided in state.",
+                confidence=1.0
+            )]}}
+
     with tempfile.TemporaryDirectory() as tmpdir:
+        print(f"DEBUG: Using tmpdir: {tmpdir}")
         # 1. Stateless Sandbox Clone
         try:
-            subprocess.run(
-                ["git", "clone", repo_url, "."],
+            print(f"DEBUG: Cloning {repo_url}...")
+            clone_res = subprocess.run(
+                ["git", "clone", "--depth", "1", repo_url, "."],
                 cwd=tmpdir,
                 capture_output=True,
                 check=False,
-                timeout=30
+                timeout=300
             )
+            print(f"DEBUG: Clone result code: {clone_res.returncode}")
+            if clone_res.returncode != 0:
+                print(f"DEBUG: Clone failed: {clone_res.stderr.decode()}")
             
-            # 2. Deep AST Analysis
-            # In a real scenario, we'd find the graph file. Here we assume src/graph.py
-            graph_path = os.path.join(tmpdir, "src/graph.py")
-            if os.path.exists(graph_path):
-                graph_data = RepoTools.analyze_graph_structure(graph_path)
+            # 2. Comprehensive Forensic Scan
+            source_files = []
+            for root, _, files in os.walk(tmpdir):
+                if any(x in root for x in [".git", "node_modules", "__pycache__"]):
+                    continue
+                for f in files:
+                    if f.endswith((".py", ".ts", ".js")):
+                        source_files.append(os.path.join(root, f))
+            
+            print(f"DEBUG: Found {len(source_files)} potential source files.")
+            
+            # Find the best candidate for the "Graph"
+            graph_candidate = os.path.join(tmpdir, "src/graph.py")
+            if not os.path.exists(graph_candidate):
+                 print("DEBUG: src/graph.py not found. Searching for candidates...")
+                 candidates = [f for f in source_files if "graph" in f.lower()]
+                 if candidates:
+                     graph_candidate = candidates[0]
+                     print(f"DEBUG: Selected candidate: {graph_candidate}")
+                 elif source_files:
+                     graph_candidate = source_files[0] 
+                     print(f"DEBUG: Fallback selected: {graph_candidate}")
+            
+            if os.path.exists(graph_candidate):
+                print(f"DEBUG: Analyzing {graph_candidate}...")
+                graph_data = RepoTools.analyze_graph_structure(graph_candidate)
                 evidences.append(Evidence(
                     goal="Verify Graph Parallelism",
                     found=graph_data.state_graph_instance_found,
-                    location="src/graph.py",
-                    rationale=f"AST found {len(graph_data.edges)} edges. Fan-out: {graph_data.fan_out_count}.",
-                    confidence=1.0 if graph_data.state_graph_instance_found else 0.0,
-                    metadata=graph_data.dict()
+                    location=os.path.relpath(graph_candidate, tmpdir),
+                    rationale=f"Pattern: {graph_data.node_type}. Line: {graph_data.initialization_line}.",
+                    confidence=1.0 if graph_data.state_graph_instance_found else 0.5
                 ))
+            else:
+                print("DEBUG: No graph candidate found.")
             
-            # 3. Reducer Verification
-            state_path = os.path.join(tmpdir, "src/state.py")
-            if os.path.exists(state_path):
-                reducer_data = RepoTools.verify_reducer_robustness(state_path)
+            # 3. Reducer Verification (Fallback)
+            state_candidate = os.path.join(tmpdir, "src/state.py")
+            if os.path.exists(state_candidate):
+                print(f"DEBUG: Analyzing {state_candidate} for reducers...")
+                reducer_data = RepoTools.verify_reducer_robustness(state_candidate)
                 evidences.append(Evidence(
                     goal="Verify Reducer Robustness",
                     found=reducer_data.is_robust,
                     location="src/state.py",
                     rationale=f"Found reducers: {reducer_data.reducers_found}.",
-                    confidence=1.0 if reducer_data.annotated_found else 0.0,
-                    metadata=reducer_data.dict()
-                ))
-
-            # 4. Tool Safety Check
-            if os.path.exists(graph_path):
-                safety_data = RepoTools.verify_tool_safety(graph_path)
-                evidences.append(Evidence(
-                    goal="Verify Tool Safety",
-                    found=safety_data.is_safe,
-                    location="src/graph.py",
-                    rationale=f"Found unsafe calls: {safety_data.unsafe_calls_found}." if not safety_data.is_safe else "No unsafe calls (os.system, eval) detected.",
-                    confidence=1.0,
-                    metadata=safety_data.dict()
+                    confidence=1.0 if reducer_data.annotated_found else 0.0
                 ))
 
             # 5. Git History Analysis
+            print("DEBUG: Extracting git history...")
             git_data = RepoTools.extract_git_history(tmpdir)
             evidences.append(Evidence(
                 goal="Verify Development Narrative",
                 found=git_data.commit_count > 0,
                 location="git history",
                 rationale=f"Pattern: {git_data.development_pattern}. Commits: {git_data.commit_count}.",
-                confidence=0.95,
-                metadata=git_data.dict()
+                confidence=0.95
             ))
 
         except Exception as e:
-            print(f"Repo Investigator Failed: {e}")
+            print(f"DEBUG: Repo Investigator Exception: {e}")
             evidences.append(Evidence(
                 goal="Environment Clone",
                 found=False,
@@ -110,8 +135,7 @@ def DocAnalyst(state: AgentState):
                 found=True,
                 location=f"{pdf_path}:p{top.page_number}",
                 rationale=f"Found match on page {top.page_number} with confidence {top.confidence:.2f}.",
-                confidence=top.confidence,
-                metadata={"chunk_id": top.chunk_id, "page": top.page_number}
+                confidence=top.confidence
             ))
     else:
         evidences.append(Evidence(
@@ -142,8 +166,7 @@ def VisionInspector(state: AgentState):
                 found=vision_data.diagram_type == "LangGraph",
                 location=f"{pdf_path}:img1",
                 rationale=f"Type: {vision_data.diagram_type}. START/END: {vision_data.contains_START}/{vision_data.contains_END}.",
-                confidence=min(0.8, vision_data.confidence), # Capped at 0.8
-                metadata=vision_data.dict()
+                confidence=min(0.8, vision_data.confidence) # Capped at 0.8
             ))
 
     return {"evidences": {"vision": evidences}}

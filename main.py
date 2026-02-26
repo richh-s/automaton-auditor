@@ -1,6 +1,9 @@
 import argparse
 import os
+from dotenv import load_dotenv
 from src.graph import graph
+
+load_dotenv()
 
 def main():
     parser = argparse.ArgumentParser(description="Automaton Auditor: Forensic Swarm Orchestrator")
@@ -17,15 +20,19 @@ def main():
         "repo_url": args.repo,
         "pdf_path": args.pdf,
         "rubric_dimensions": [],
-        "evidences": {}, # Identity value for operator.ior
-        "opinions": [],  # Identity value for operator.add
-        "conflict_log": [], # Future-proofed resolution tracking
+        "evidences": {}, 
+        "opinions": [],  
+        "final_report": None # Initial value
     }
     
     print("\nInvoking Graph Orchestrator...")
     result = graph.invoke(initial_state)
     print("\n--- PHASE 1 COMPLETE ---")
-    print(f"Conflicts found: {len(result['conflict_log'])}")
+    
+    report = result.get("final_report")
+    if report:
+        print(f"\nFinal Executive Summary:\n{report.executive_summary}")
+        print(f"Overall Score: {report.overall_score}/5.0")
 
 if __name__ == "__main__":
     main()

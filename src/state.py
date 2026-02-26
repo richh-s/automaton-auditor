@@ -9,91 +9,69 @@ from typing_extensions import TypedDict
 
 
 class Evidence(BaseModel):
-    """
-    Structured forensic evidence collected by detective agents.
-    """
-    goal: str = Field(description="The specific forensic objective being verified")
-    found: bool = Field(description="Whether the targeted artifact or pattern exists")
-    content: Optional[str] = Field(default=None, description="Snippets or raw data extracted for proof")
-    location: str = Field(description="File path, line number, or git commit hash")
-    rationale: str = Field(description="Step-by-step reasoning for the finding")
-    confidence: float = Field(ge=0.0, le=1.0, description="Confidence score from 0.0 to 1.0")
-    metadata: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Structured forensic metadata (AST types, git timestamps, etc.)",
+    goal: str = Field()
+    found: bool = Field(description="Whether the artifact exists")
+    content: Optional[str] = Field(default=None)
+    location: str = Field(
+        description="File path or commit hash",
     )
+    rationale: str = Field(
+        description="Your rationale for your confidence "
+        "on the evidence you find for this particular goal",
+    )
+    confidence: float
 
 
 # --- Judge Output ---
 
 
 class JudicialOpinion(BaseModel):
-    """
-    Synthesized judgment on a specific rubric criterion.
-    """
-    judge: Literal["Prosecutor", "Defense", "TechLead"] = Field(description="The persona providing the opinion")
-    criterion_id: str = Field(description="The ID of the rubric dimension being evaluated")
-    score: int = Field(ge=1, le=5, description="Score on a 1-5 scale per rubric guidelines")
-    argument: str = Field(description="Detailed justification for the assigned score")
-    cited_evidence: List[str] = Field(description="List of Evidence goal names supported this judgment")
+    judge: Literal["Prosecutor", "Defense", "TechLead"]
+    criterion_id: str
+    score: int = Field(ge=1, le=5)
+    argument: str
+    cited_evidence: List[str]
 
 
 # --- Chief Justice Output ---
 
 
 class CriterionResult(BaseModel):
-    """
-    Final consensus result for a specific dimension.
-    """
-    dimension_id: str = Field(description="The ID of the dimension")
-    dimension_name: str = Field(description="Human-readable name of the dimension")
-    final_score: int = Field(ge=1, le=5, description="The weighted average score")
-    judge_opinions: List[JudicialOpinion] = Field(description="Collection of opinions from the parallel judicial swarm")
+    dimension_id: str
+    dimension_name: str
+    final_score: int = Field(ge=1, le=5)
+    judge_opinions: List[JudicialOpinion]
     dissent_summary: Optional[str] = Field(
         default=None,
-        description="Detailed explanation of score variance if threshold is exceeded",
+        description="Required when score variance > 2",
     )
     remediation: str = Field(
-        description="Actionable technical steps to improve the score",
+        description="Specific file-level instructions "
+        "for improvement",
     )
 
 
 class AuditReport(BaseModel):
-    """
-    The final forensic audit report.
-    """
-    repo_url: str = Field(description="The URL of the target repository")
-    executive_summary: str = Field(description="High-level overview of the audit findings")
-    overall_score: float = Field(description="Aggregated score across all dimensions")
-    criteria: List[CriterionResult] = Field(description="Breakdown of results by dimension")
-    remediation_plan: str = Field(description="Comprehensive technical roadmap for fixes")
+    repo_url: str
+    executive_summary: str
+    overall_score: float
+    criteria: List[CriterionResult]
+    remediation_plan: str
 
 
 # --- Graph State ---
 
 
 class AgentState(TypedDict):
-    """
-    The global state container for the Automaton Auditor graph.
-    Designed for safe parallel execution using commutitave reducers.
-    """
-    repo_url: str # Target URL
-    pdf_path: str # Path to report.pdf
-    rubric_dimensions: List[Dict] # Collection of evaluation criteria
-    
-    # eviences uses operator.ior (dict merge) to allow multiple nodes
-    # to contribute to different keys without overwriting each other.
+    repo_url: str
+    pdf_path: str
+    rubric_dimensions: List[Dict]
+    # Use reducers to prevent parallel agents
+    # from overwriting data
     evidences: Annotated[
         Dict[str, List[Evidence]], operator.ior
     ]
-    
-    # opinions and conflict_log use operator.add (list append)
-    # ensuring all parallel branch outputs are collected.
     opinions: Annotated[
         List[JudicialOpinion], operator.add
     ]
-    conflict_log: Annotated[
-        List[str], operator.add
-    ]
-    
     final_report: AuditReport
