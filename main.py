@@ -20,9 +20,11 @@ def main():
         "repo_url": args.repo,
         "pdf_path": args.pdf,
         "rubric_dimensions": [],
+        "synthesis_rules": {},
         "evidences": {}, 
-        "opinions": [],  
-        "final_report": None # Initial value
+        "opinions": [],
+        "conflict_log": [],
+        "final_report": None
     }
     
     print("\nInvoking Graph Orchestrator...")
@@ -31,8 +33,36 @@ def main():
     
     report = result.get("final_report")
     if report:
-        print(f"\nFinal Executive Summary:\n{report.executive_summary}")
-        print(f"Overall Score: {report.overall_score}/5.0")
+        print(f"\n{'='*60}")
+        print(f"FORENSIC AUDIT REPORT")
+        print(f"{'='*60}")
+        print(f"\nExecutive Summary: {report.executive_summary}")
+        print(f"Overall Score: {report.overall_score:.2f}/5.0")
+        print(f"\n--- Per-Dimension Breakdown ---")
+        for c in report.criteria:
+            print(f"\n  [{c.dimension_id}] {c.dimension_name}")
+            print(f"    Final Score: {c.final_score}/5")
+            if c.dissent_summary:
+                print(f"    DISSENT: {c.dissent_summary}")
+            for op in c.judge_opinions:
+                print(f"      {op.judge} ({op.score}/5): {op.argument[:120]}...")
+        print(f"\nRemediation Plan: {report.remediation_plan}")
+        print(f"{'='*60}")
+    
+    # Also print conflicts
+    conflicts = result.get("conflict_log", [])
+    if conflicts:
+        print(f"\n⚠️  FORENSIC CONFLICTS DETECTED:")
+        for c in conflicts:
+            print(f"  - {c}")
+    
+    # Print raw evidence keys
+    evidences = result.get("evidences", {})
+    print(f"\n--- Evidence Sources ---")
+    for src, evs in evidences.items():
+        print(f"  [{src}]: {len(evs)} evidence items")
+        for ev in evs:
+            print(f"    - {ev.goal}: found={ev.found}, conf={ev.confidence:.2f}")
 
 if __name__ == "__main__":
     main()

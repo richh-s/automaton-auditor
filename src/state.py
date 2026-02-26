@@ -66,6 +66,7 @@ class AgentState(TypedDict):
     repo_url: str
     pdf_path: str
     rubric_dimensions: List[Dict]
+    synthesis_rules: Dict
     # Use reducers to prevent parallel agents
     # from overwriting data
     evidences: Annotated[
@@ -74,4 +75,7 @@ class AgentState(TypedDict):
     opinions: Annotated[
         List[JudicialOpinion], operator.add
     ]
-    final_report: AuditReport
+    conflict_log: Annotated[
+        List[str], operator.add
+    ]
+    final_report: Optional[AuditReport]

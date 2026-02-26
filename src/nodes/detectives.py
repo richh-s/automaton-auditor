@@ -5,168 +5,145 @@ from src.tools.vision_tools import VisionTools
 import os
 import tempfile
 import subprocess
+import json
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+
+# --- Infrastructure Layer (Phase 3) ---
+
+def ContextBuilder(state: AgentState):
+    """
+    The Context Builder: Loads the rubric and prepares dimensions for dispatch.
+    """
+    print("--- CONTEXT BUILDER: Loading Forensic Constitution ---")
+    with open("rubric.json", "r") as f:
+        rubric = json.load(f)
+    
+    return {
+        "rubric_dimensions": rubric["dimensions"],
+        "synthesis_rules": rubric["synthesis_rules"]
+    }
 
 # --- Detective Layer (Forensic Sub-Agents) ---
 
 def RepoInvestigator(state: AgentState):
     """
     Forensic code analysis.
-    Uses Deep AST Parsing to verify structure and Git Forensics for narrative.
+    Uses LLM to interpret specialized forensic instructions and extract evidence.
     """
-    print(f"--- REPO INVESTIGATOR (Deep AST & Git Forensics) ---")
+    print(f"--- REPO INVESTIGATOR (Forensic Logic) ---")
     repo_url = state.get("repo_url", "")
+    tasks = [d for d in state.get("rubric_dimensions", []) if d["target_artifact"] == "github_repo"]
     evidences = []
 
     if not repo_url:
-         print("DEBUG: No repo URL provided.")
-         return {"evidences": {"repo": [Evidence(
-                goal="Environment Clone",
-                found=False,
-                location="None",
-                rationale="No repository URL provided in state.",
-                confidence=1.0
-            )]}}
+         return {"evidences": {"repo": []}}
+
+    llm = ChatOpenAI(model="gpt-4o", temperature=0).with_structured_output(Evidence)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        print(f"DEBUG: Using tmpdir: {tmpdir}")
-        # 1. Stateless Sandbox Clone
         try:
-            print(f"DEBUG: Cloning {repo_url}...")
-            clone_res = subprocess.run(
-                ["git", "clone", "--depth", "1", repo_url, "."],
-                cwd=tmpdir,
-                capture_output=True,
-                check=False,
-                timeout=300
-            )
-            print(f"DEBUG: Clone result code: {clone_res.returncode}")
-            if clone_res.returncode != 0:
-                print(f"DEBUG: Clone failed: {clone_res.stderr.decode()}")
+            # 1. Clone
+            subprocess.run(["git", "clone", "--depth", "1", "--filter=blob:none", repo_url, "."], cwd=tmpdir, check=True, capture_output=True, timeout=600)
             
-            # 2. Comprehensive Forensic Scan
-            source_files = []
-            for root, _, files in os.walk(tmpdir):
-                if any(x in root for x in [".git", "node_modules", "__pycache__"]):
-                    continue
-                for f in files:
-                    if f.endswith((".py", ".ts", ".js")):
-                        source_files.append(os.path.join(root, f))
+            # 2. Extract context for the LLM
+            git_history = str(subprocess.run(["git", "log", "--oneline", "-n", "20"], cwd=tmpdir, capture_output=True).stdout.decode())
             
-            print(f"DEBUG: Found {len(source_files)} potential source files.")
-            
-            # Find the best candidate for the "Graph"
-            graph_candidate = os.path.join(tmpdir, "src/graph.py")
-            if not os.path.exists(graph_candidate):
-                 print("DEBUG: src/graph.py not found. Searching for candidates...")
-                 candidates = [f for f in source_files if "graph" in f.lower()]
-                 if candidates:
-                     graph_candidate = candidates[0]
-                     print(f"DEBUG: Selected candidate: {graph_candidate}")
-                 elif source_files:
-                     graph_candidate = source_files[0] 
-                     print(f"DEBUG: Fallback selected: {graph_candidate}")
-            
-            if os.path.exists(graph_candidate):
-                print(f"DEBUG: Analyzing {graph_candidate}...")
-                graph_data = RepoTools.analyze_graph_structure(graph_candidate)
-                evidences.append(Evidence(
-                    goal="Verify Graph Parallelism",
-                    found=graph_data.state_graph_instance_found,
-                    location=os.path.relpath(graph_candidate, tmpdir),
-                    rationale=f"Pattern: {graph_data.node_type}. Line: {graph_data.initialization_line}.",
-                    confidence=1.0 if graph_data.state_graph_instance_found else 0.5
-                ))
-            else:
-                print("DEBUG: No graph candidate found.")
-            
-            # 3. Reducer Verification (Fallback)
-            state_candidate = os.path.join(tmpdir, "src/state.py")
-            if os.path.exists(state_candidate):
-                print(f"DEBUG: Analyzing {state_candidate} for reducers...")
-                reducer_data = RepoTools.verify_reducer_robustness(state_candidate)
-                evidences.append(Evidence(
-                    goal="Verify Reducer Robustness",
-                    found=reducer_data.is_robust,
-                    location="src/state.py",
-                    rationale=f"Found reducers: {reducer_data.reducers_found}.",
-                    confidence=1.0 if reducer_data.annotated_found else 0.0
-                ))
+            # 3. Dynamic Forensic Execution
+            for task in tasks:
+                print(f"DEBUG: Executing Instruction for '{task['name']}'")
+                
+                # Context gathering based on task hint
+                context = f"Git History:\n{git_history}\n"
+                if "state" in task["forensic_instruction"].lower():
+                    # Quick scan for state files
+                    for root, _, files in os.walk(tmpdir):
+                        for f in files:
+                            if "state" in f or "graph" in f:
+                                with open(os.path.join(root, f), "r") as src:
+                                    context += f"--- {f} ---\n{src.read()[:2000]}\n"
 
-            # 5. Git History Analysis
-            print("DEBUG: Extracting git history...")
-            git_data = RepoTools.extract_git_history(tmpdir)
-            evidences.append(Evidence(
-                goal="Verify Development Narrative",
-                found=git_data.commit_count > 0,
-                location="git history",
-                rationale=f"Pattern: {git_data.development_pattern}. Commits: {git_data.commit_count}.",
-                confidence=0.95
-            ))
+                prompt = ChatPromptTemplate.from_messages([
+                    ("system", "You are a Forensic Code Detective. Execute the following instruction on the provided context. "
+                               "Return an Evidence object. Instruction: {instruction}"),
+                    ("user", "Context:\n{context}")
+                ])
+                
+                chain = prompt | llm
+                ev = chain.invoke({"instruction": task["forensic_instruction"], "context": context})
+                ev.goal = task["name"] # Align goal with dimension name
+                evidences.append(ev)
 
         except Exception as e:
-            print(f"DEBUG: Repo Investigator Exception: {e}")
-            evidences.append(Evidence(
-                goal="Environment Clone",
-                found=False,
-                location=repo_url,
-                rationale=f"Cloning failed: {str(e)}",
-                confidence=1.0
-            ))
+            print(f"DEBUG: Repo Error: {e}")
+            evidences.append(Evidence(goal="Cloning", found=False, location=repo_url, rationale=str(e), confidence=1.0))
 
     return {"evidences": {"repo": evidences}}
 
 def DocAnalyst(state: AgentState):
     """
-    Forensic document analysis using RAG-lite.
+    Forensic document analysis using RAG-lite and instruction-following.
     """
-    print("--- DOC ANALYST (Citation-Preserving RAG-lite) ---")
+    print("--- DOC ANALYST (Instruction-Following RAG) ---")
     pdf_path = state.get("pdf_path")
+    tasks = [d for d in state.get("rubric_dimensions", []) if d["target_artifact"] == "pdf_report"]
     evidences = []
 
-    if os.path.exists(pdf_path):
-        chunks = DocTools.ingest_pdf(pdf_path)
+    if not pdf_path or not os.path.exists(pdf_path):
+        return {"evidences": {"doc": []}}
+
+    llm = ChatOpenAI(model="gpt-4o", temperature=0).with_structured_output(Evidence)
+    chunks = DocTools.ingest_pdf(pdf_path)
+
+    for task in tasks:
+        # Simple search for instruction keywords
+        keywords = ["Metacognition", "Dialectical", "Fan-In", "Integrity"]
+        query = next((k for k in keywords if k.lower() in task["forensic_instruction"].lower()), "architecture")
         
-        # Simulated Query: "Check for Metacognition"
-        metacog_results = DocTools.rag_lite_query("metacognition", chunks)
-        if metacog_results:
-            top = metacog_results[0]
-            evidences.append(Evidence(
-                goal="Verify Metacognitive Claims",
-                found=True,
-                location=f"{pdf_path}:p{top.page_number}",
-                rationale=f"Found match on page {top.page_number} with confidence {top.confidence:.2f}.",
-                confidence=top.confidence
-            ))
-    else:
-        evidences.append(Evidence(
-            goal="Locate PDF Report",
-            found=False,
-            location=pdf_path,
-            rationale="Report file missing from workspace.",
-            confidence=1.0
-        ))
+        rag_results = DocTools.rag_lite_query(query, chunks)
+        context = "\n".join([f"Page {r.page_number}: {r.content}" for r in rag_results])
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are a Forensic Document Analyst. Extract evidence for the following instruction. "
+                       "Instruction: {instruction}"),
+            ("user", "Context from PDF:\n{context}")
+        ])
+        
+        chain = prompt | llm
+        ev = chain.invoke({"instruction": task["forensic_instruction"], "context": context})
+        ev.goal = task["name"]
+        evidences.append(ev)
 
     return {"evidences": {"doc": evidences}}
 
 def VisionInspector(state: AgentState):
     """
-    Forensic diagram analysis with strict logic gates.
+    Forensic diagram analysis with strict instruction gates.
     """
-    print("--- VISION INSPECTOR (Multimodal Discrimination) ---")
+    print("--- VISION INSPECTOR (Instruction-Following Vision) ---")
     pdf_path = state.get("pdf_path")
+    tasks = [d for d in state.get("rubric_dimensions", []) if d["target_artifact"] == "pdf_images"]
     evidences = []
 
-    if os.path.exists(pdf_path):
-        images = VisionTools.extract_images_from_pdf(pdf_path)
-        if images:
-            # Analyze first image
-            vision_data = VisionTools.analyze_diagram(images[0])
-            evidences.append(Evidence(
-                goal="Verify Architectural Diagram",
-                found=vision_data.diagram_type == "LangGraph",
-                location=f"{pdf_path}:img1",
-                rationale=f"Type: {vision_data.diagram_type}. START/END: {vision_data.contains_START}/{vision_data.contains_END}.",
-                confidence=min(0.8, vision_data.confidence) # Capped at 0.8
-            ))
+    if not pdf_path or not os.path.exists(pdf_path):
+        return {"evidences": {"vision": []}}
+
+    images = VisionTools.extract_images_from_pdf(pdf_path)
+    if not images:
+        return {"evidences": {"vision": []}}
+
+    # For now, we use a single visual check for all image-related tasks
+    # In a full impl, we'd iterate and match
+    vision_data = VisionTools.analyze_diagram(images[0])
+    
+    for task in tasks:
+        ev = Evidence(
+            goal=task["name"],
+            found=vision_data.diagram_type == "LangGraph",
+            location=f"{pdf_path}:img1",
+            rationale=f"Detected {vision_data.diagram_type}. {task['forensic_instruction'][:50]}...",
+            confidence=vision_data.confidence
+        )
+        evidences.append(ev)
 
     return {"evidences": {"vision": evidences}}
