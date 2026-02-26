@@ -1,13 +1,13 @@
 import fitz
 from typing import List, Dict, Optional, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class VisionForensics(BaseModel):
-    contains_START: bool = False
-    contains_END: bool = False
-    start_outgoing_count: int = 0
-    diagram_type: str = "Generic"
-    confidence: float = 0.0
+    contains_START: bool = Field(default=False)
+    contains_END: bool = Field(default=False)
+    start_outgoing_count: int = Field(default=0)
+    diagram_type: str = Field(default="Generic")
+    confidence: float = Field(default=0.0)
 
 class VisionTools:
     @staticmethod

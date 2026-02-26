@@ -3,43 +3,50 @@ import subprocess
 import tempfile
 from datetime import datetime
 from typing import Dict, List, Optional, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class GraphForensics(BaseModel):
     state_graph_instance_found: bool = False
     graph_variable_name: Optional[str] = None
-    edges: List[Dict[str, str]] = []
+    initialization_line: Optional[int] = None
+    node_type: Optional[str] = None
+    edges: List[Dict[str, str]] = Field(default_factory=list)
+    nodes: List[str] = Field(default_factory=list)
     fan_out_count: int = 0
     fan_in_count: int = 0
     conditional_edges_count: int = 0
     is_compiled: bool = False
     compiled_on_correct_instance: bool = False
+    is_spaghetti: bool = False
+    violation_details: List[str] = Field(default_factory=list)
 
 class ReducerForensics(BaseModel):
     annotated_found: bool = False
-    reducers_found: List[str] = []
+    reducers_found: List[str] = Field(default_factory=list)
     is_robust: bool = False
 
 class GitForensics(BaseModel):
     commit_count: int = 0
     time_delta_seconds: float = 0
-    development_pattern: str = "Unknown"
-    commits: List[Dict[str, Any]] = []
+    development_pattern: str = "Unknown" # Atomic vs Monolithic
+    commits: List[Dict[str, Any]] = Field(default_factory=list)
 
 class SafetyForensics(BaseModel):
-    unsafe_calls_found: List[str] = []
+    unsafe_calls_found: List[str] = Field(default_factory=list)
     is_safe: bool = True
 
 class RepoTools:
     @staticmethod
     def analyze_graph_structure(path: str) -> GraphForensics:
         """
-        Performs deep AST parsing to verify StateGraph structure.
+        Performs deep AST parsing to verify StateGraph structure and metadata.
+        Targeting Peer Review Q1 (Line Numbers) and Q3 (Spaghetti Script).
         """
         forensics = GraphForensics()
         try:
             with open(path, "r") as f:
-                tree = ast.parse(f.read())
+                content = f.read()
+                tree = ast.parse(content)
         except Exception:
             return forensics
 
@@ -49,16 +56,29 @@ class RepoTools:
             def visit_Assign(self, node):
                 # Detect StateGraph instantiation
                 if isinstance(node.value, ast.Call):
-                    if getattr(node.value.func, "id", None) == "StateGraph":
+                    func_name = getattr(node.value.func, "id", None)
+                    if not func_name and isinstance(node.value.func, ast.Attribute):
+                        func_name = node.value.func.attr
+                        
+                    if func_name == "StateGraph":
                         forensics.state_graph_instance_found = True
+                        forensics.initialization_line = node.lineno
+                        forensics.node_type = node.value.__class__.__name__ # Should be 'Call'
                         if isinstance(node.targets[0], ast.Name):
                             forensics.graph_variable_name = node.targets[0].id
                 self.generic_visit(node)
 
             def visit_Call(self, node):
-                # Track builder.add_edge(src, dst)
+                # Track builder.add_node(name, func)
                 if isinstance(node.func, ast.Attribute):
-                    if node.func.attr == "add_edge":
+                    if node.func.attr == "add_node":
+                        if len(node.args) >= 1:
+                            node_name = self._get_val(node.args[0])
+                            if node_name:
+                                forensics.nodes.append(node_name)
+
+                    # Track builder.add_edge(src, dst)
+                    elif node.func.attr == "add_edge":
                         if len(node.args) >= 2:
                             src = self._get_val(node.args[0])
                             dst = self._get_val(node.args[1])
@@ -90,15 +110,38 @@ class RepoTools:
         
         # Compute fan-out/fan-in
         if "START" in adjacency_map:
-            forensics.fan_out_count = len(adjacency_map["START"])
+            fan_out_nodes = adjacency_map.get("START", [])
+            forensics.fan_out_count = len(fan_out_nodes)
             
-        dest_counts = {}
-        for edges in adjacency_map.values():
-            for dst in edges:
-                dest_counts[dst] = dest_counts.get(dst, 0) + 1
+        dest_counts: Dict[str, int] = {}
+        for edges_list in adjacency_map.values():
+            if edges_list:
+                for dst in edges_list:
+                    dest_counts[dst] = dest_counts.get(dst, 0) + 1
         
         forensics.fan_in_count = max(dest_counts.values()) if dest_counts else 0
         
+        # 3. Language-Agnostic Fallback (Peer Review Q1/Q3)
+        if not forensics.state_graph_instance_found:
+             # Search for common StateGraph/Swarm patterns in the whole file
+             patterns = ["StateGraph", "Workflow", "Swarm", "Arbiter", "Agent"]
+             for p in patterns:
+                 if p in content:
+                     forensics.state_graph_instance_found = True
+                     # Approximate line number
+                     lines = content.split("\n")
+                     for i, line in enumerate(lines):
+                         if p in line:
+                             forensics.initialization_line = i + 1
+                             forensics.node_type = f"String Match ({p})"
+                             break
+                     break
+        
+        # 4. Spaghetti Script Heuristics (Language Agnostic)
+        if "switch" in content and content.count("case") > 15:
+            forensics.is_spaghetti = True
+            forensics.violation_details.append("Large switch/case statement (>15) detected; consider modular state machine.")
+
         return forensics
 
     @staticmethod
@@ -156,7 +199,7 @@ class RepoTools:
         class SafetyVisitor(ast.NodeVisitor):
             def visit_Call(self, node):
                 func_name = self._get_name(node.func)
-                if func_name in unsafe_targets:
+                if func_name and func_name in unsafe_targets:
                     forensics.unsafe_calls_found.append(func_name)
                     forensics.is_safe = False
                 self.generic_visit(node)
@@ -206,18 +249,20 @@ class RepoTools:
             
             forensics.commits = commit_data
             
-            if len(commit_data) >= 2:
+            if len(commit_data) >= 3: # Rubric seeks > 3 commits for success
                 first_date = datetime.fromisoformat(commit_data[0]["date"].replace("Z", "+00:00"))
                 last_date = datetime.fromisoformat(commit_data[-1]["date"].replace("Z", "+00:00"))
-                delta = (last_date - first_date).total_seconds()
-                forensics.time_delta_seconds = delta
+                delta_minutes = (last_date - first_date).total_seconds() / 60
                 
-                if delta < 600: # 10 minutes
-                    forensics.development_pattern = "Monolithic Dump"
+                # Rule: If > 3 commits and spread over > 20 mins, likely atomic/iterative
+                if delta_minutes > 20: 
+                    forensics.development_pattern = "Atomic"
                 else:
-                    forensics.development_pattern = "Iterative Development"
+                    forensics.development_pattern = "Monolithic Dump"
+            elif len(commit_data) > 0:
+                forensics.development_pattern = "Monolithic Dump"
             else:
-                forensics.development_pattern = "Single Commit Pattern"
+                forensics.development_pattern = "No Commits"
                 
         except Exception:
             pass
