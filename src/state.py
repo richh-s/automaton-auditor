@@ -1,5 +1,6 @@
 import operator
 from typing import Annotated, Any, Dict, List, Literal, Optional
+from decimal import Decimal, ROUND_HALF_UP
 
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
@@ -31,6 +32,15 @@ class JudicialOpinion(BaseModel):
     score: int = Field(ge=1, le=5)
     argument: str
     cited_evidence: List[str]
+
+
+# --- Conflict Entry (Structured) ---
+
+
+class ConflictEntry(BaseModel):
+    tag: Literal["SECURITY", "FACTCHECK"]
+    dimension_id: str
+    message: str
 
 
 # --- Chief Justice Output ---
@@ -76,6 +86,6 @@ class AgentState(TypedDict):
         List[JudicialOpinion], operator.add
     ]
     conflict_log: Annotated[
-        List[str], operator.add
+        List["ConflictEntry"], operator.add
     ]
     final_report: Optional[AuditReport]

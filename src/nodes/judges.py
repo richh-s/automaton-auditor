@@ -1,8 +1,9 @@
 import json
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from src.state import AgentState, JudicialOpinion, CriterionResult, AuditReport
+from src.state import AgentState, JudicialOpinion, CriterionResult, AuditReport, ConflictEntry
 from typing import List
+from decimal import Decimal, ROUND_HALF_UP
 
 # --- Judicial Layer (Phas 3) ---
 
@@ -102,15 +103,14 @@ def TechLead(state: AgentState):
 
 def ChiefJustice(state: AgentState):
     """
-    The Final Authority: Synthesizes opinions using Forensic Synthesis Rules.
-    (Weighted Arbitration, Security Overrides, Hallucination Penalties)
+    The Final Authority: Synthesizes opinions using a deterministic,
+    rule-driven scoring pipeline.
+    Pipeline: Hard Caps -> Authoritative Score -> Weighted Fallback -> Clamp
     """
     print("--- SUPREME COURT: CHIEF JUSTICE ---")
     
-    rules = state["synthesis_rules"]
     conflicts = state.get("conflict_log", [])
     criteria_results = []
-    
     dimension_scores = {}
     
     for dim in state["rubric_dimensions"]:
@@ -128,52 +128,99 @@ def ChiefJustice(state: AgentState):
         d_score = d_op.score if d_op else 1
         t_score = t_op.score if t_op else 1
 
-        # Rule: Functionality Weight (Tech Lead carries highest weight if modular)
-        # We'll use 40% Tech Lead, 30% Prosecutor, 30% Defense
-        score = (t_score * 0.4) + (p_score * 0.3) + (d_score * 0.3)
-        
-        # Rule: Fact Supremacy (Check for hallucinations in opinions)
-        # If Defense claims something found but detectives log a conflict...
-        dim_conflicts = [c for c in conflicts if dim["name"] in c or dim["id"] in c]
-        if dim_conflicts:
-            score -= 1.0 # Fact-check penalty
-        
-        # Rule: Dissent Requirement (Variance > 2)
+        # --- Step 1: Hard Caps & Overrides ---
+        security_capped = False
+        dim_security = [c for c in conflicts if c.tag == "SECURITY" and c.dimension_id == dim_id]
+        dim_factcheck = [c for c in conflicts if c.tag == "FACTCHECK" and c.dimension_id == dim_id]
+
+        if dim_security:
+            security_capped = True  # Will cap after scoring
+
+        if dim_factcheck:
+            d_score = 1  # Hallucination penalty: Defense is overruled
+
+        # --- Step 2: Authoritative Score (dimension-specific) ---
+        score = None
+        if dim_id == "graph_orchestration" and t_score >= 4:
+            score = float(t_score)  # TechLead is sole authority for architecture
+
+        # --- Step 3: Weighted Fallback (only if no authoritative rule applied) ---
+        if score is None:
+            score = (t_score * 0.4) + (p_score * 0.3) + (d_score * 0.3)
+
+        # Apply security cap after scoring
+        if security_capped:
+            score = min(score, 3.0)
+
+        # --- Step 4: Clamping & Rounding (Decimal ROUND_HALF_UP) ---
+        score = float(Decimal(str(score)).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+        score = max(1.0, min(5.0, score))
+        final_score = int(score)
+
+        # --- Dissent Detection (symmetric: max - min across all 3 judges) ---
+        all_scores = [p_score, d_score, t_score]
+        variance = max(all_scores) - min(all_scores)
         dissent = None
-        if p_op and d_op and abs(p_op.score - d_op.score) > 2:
-            dissent = f"Major disagreement: Prosecutor ({p_op.score}) vs Defense ({d_op.score}). {p_op.argument[:50]}... vs {d_op.argument[:50]}..."
+        if variance > 2:
+            high_judge = max(dim_ops, key=lambda o: o.score)
+            low_judge = min(dim_ops, key=lambda o: o.score)
+            dissent = (
+                f"Major disagreement (spread={variance}): "
+                f"{high_judge.judge} ({high_judge.score}/5) vs "
+                f"{low_judge.judge} ({low_judge.score}/5). "
+                f"High: {high_judge.argument[:80]}... "
+                f"Low: {low_judge.argument[:80]}..."
+            )
 
         criteria_results.append(CriterionResult(
             dimension_id=dim_id,
             dimension_name=dim["name"],
-            final_score=int(max(1, min(5, score))),
+            final_score=final_score,
             judge_opinions=dim_ops,
             dissent_summary=dissent,
             remediation=t_op.argument if t_op else "Follow success pattern."
         ))
-        dimension_scores[dim_id] = score
+        dimension_scores[dim_id] = final_score
 
-    overall_score = sum(dimension_scores.values()) / len(dimension_scores) if dimension_scores else 0
+    # --- Overall Score ---
+    overall_score = sum(dimension_scores.values()) / len(dimension_scores) if dimension_scores else 0.0
     
-    # Rule: Security Override (Confirmed flaws cap total score at 3)
-    security_flaws = [c for c in conflicts if "Safe" in c or "Security" in c]
-    if security_flaws:
+    # Global security override: any security conflict caps total at 3
+    global_security = [c for c in conflicts if c.tag == "SECURITY"]
+    if global_security:
         overall_score = min(3.0, overall_score)
 
     report = AuditReport(
         repo_url=state["repo_url"],
-        executive_summary=f"Forensic audit complete with {len(conflicts)} detected conflicts.",
+        executive_summary=f"Forensic audit complete. {len(criteria_results)} dimensions evaluated, {len(conflicts)} conflicts detected.",
         overall_score=float(overall_score),
         criteria=criteria_results,
-        remediation_plan="Resolve security overrides and align report claims with AST truth."
+        remediation_plan=_build_remediation_plan(criteria_results)
     )
     
     return {"final_report": report}
 
+
+def _build_remediation_plan(criteria: List[CriterionResult]) -> str:
+    """
+    Aggregates remediation steps: grouped by severity (lowest score first),
+    deduplicated.
+    """
+    sorted_criteria = sorted(criteria, key=lambda c: c.final_score)
+    seen = set()
+    lines = []
+    for c in sorted_criteria:
+        if c.remediation and c.remediation not in seen:
+            seen.add(c.remediation)
+            lines.append(f"- **[{c.dimension_name}]** (Score: {c.final_score}/5): {c.remediation}")
+    return "\n".join(lines) if lines else "No specific remediation required."
+
+
 def EvidenceAggregator(state: AgentState):
     """
-    The Forensic Firewall (Fan-In): Synchronizes findings and identifies 
+    The Forensic Firewall (Fan-In): Synchronizes findings and identifies
     hallucinations BEFORE judges see the evidence.
+    Emits structured ConflictEntry objects with dimension-level links.
     """
     print("--- EVIDENCE AGGREGATOR (Metacognitive Barrier) ---")
     
@@ -182,11 +229,43 @@ def EvidenceAggregator(state: AgentState):
     
     conflicts = []
     
-    # Authority Rule: StateGraph Check
-    doc_claim = next((e for e in doc_ev if "Graph" in e.goal or "Architecture" in e.goal), None)
-    repo_fact = next((e for e in repo_ev if "Graph" in e.goal or "Parallelism" in e.goal), None)
+    # --- Fact-Check: Cross-reference doc claims against repo evidence ---
+    for doc_e in doc_ev:
+        # Find matching repo evidence by goal
+        repo_match = next(
+            (r for r in repo_ev if r.goal == doc_e.goal),
+            None
+        )
+        if doc_e.found and (not repo_match or not repo_match.found):
+            # Map goal to dimension_id
+            dim_id = _goal_to_dimension_id(doc_e.goal, state.get("rubric_dimensions", []))
+            conflicts.append(ConflictEntry(
+                tag="FACTCHECK",
+                dimension_id=dim_id,
+                message=f"PDF claims '{doc_e.goal}' but RepoInvestigator found NO supporting evidence."
+            ))
     
-    if doc_claim and doc_claim.found and (not repo_fact or not repo_fact.found):
-        conflicts.append(f"Fact-Check Failure: Doc claims '{doc_claim.goal}' but RepoInvestigator found NO evidence.")
+    # --- Security Check: Flag unsafe tool usage ---
+    for ev in repo_ev:
+        if ev.goal == "Safe Tool Engineering" and ev.found:
+            # Check if the evidence itself reports unsafe patterns
+            if ev.rationale and ("os.system" in ev.rationale.lower() or "unsafe" in ev.rationale.lower()):
+                conflicts.append(ConflictEntry(
+                    tag="SECURITY",
+                    dimension_id="safe_tool_engineering",
+                    message=f"Security risk detected: {ev.rationale[:200]}"
+                ))
 
     return {"conflict_log": conflicts}
+
+
+def _goal_to_dimension_id(goal: str, dimensions: list) -> str:
+    """
+    Maps a goal string (dimension name) to its dimension_id.
+    Falls back to a slugified version of the goal.
+    """
+    for dim in dimensions:
+        if dim["name"] == goal:
+            return dim["id"]
+    # Fallback: slugify
+    return goal.lower().replace(" ", "_")
