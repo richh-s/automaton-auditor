@@ -2,6 +2,7 @@ import argparse
 import os
 from dotenv import load_dotenv
 from src.graph import graph
+from src.report_writer import write_forensic_report
 
 load_dotenv()
 
@@ -63,6 +64,11 @@ def main():
         print(f"  [{src}]: {len(evs)} evidence items")
         for ev in evs:
             print(f"    - {ev.goal}: found={ev.found}, conf={ev.confidence:.2f}")
+    
+    # Write Markdown report
+    if report:
+        report_path = write_forensic_report(report)
+        print(f"\n📄 Forensic report written to: {report_path}")
 
 if __name__ == "__main__":
     main()
