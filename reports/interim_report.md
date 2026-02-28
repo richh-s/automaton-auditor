@@ -40,7 +40,7 @@ graph TD
     TechLead --> |"JudicialOpinion"| ChiefJustice
 
     subgraph "Synthesis Layer (Fan-In)"
-        ChiefJustice["ChiefJustice<br/>(Weighted Arbitration)"]
+        ChiefJustice["ChiefJustice<br/>(Rule-Driven Pipeline)"]
     end
 
     ChiefJustice --> |"FinalVerdict"| END((END))
@@ -52,7 +52,8 @@ graph TD
 ### Edge & State Definitions
 - **Evidence**: Structured pydantic objects containing `goal`, `found`, `content`, `location`, `rationale`, and `confidence`.
 - **JudicialOpinion**: Persona-driven evaluation with strict `score` (1-5), `judge` type, `criterion_id`, `argument`, and `cited_evidence`.
-- **FinalVerdict**: A synthesized `AuditReport` with consensus scores and a high-fidelity `remediation_plan`.
+- **ConflictEntry**: Structured conflict tag (`SECURITY` | `FACTCHECK`) with `dimension_id` and `message`, enabling deterministic parsing instead of fuzzy string matching.
+- **FinalVerdict**: A synthesized `AuditReport` with consensus scores, per-criterion dissent summaries, and a file-level `remediation_plan`.
 
 ### Concurrency & Determinism
 - **Execution Order Independence**: Because nodes are pure functions and the graph is acyclic, the final state is independent of the order in which parallel nodes finish their execution.
@@ -61,13 +62,61 @@ graph TD
 
 ---
 
-## ⚖️ Judicial Layer & Synthesis Plan
+## ⚖️ Judicial Layer & Synthesis
 
 ### Persona Differentiation Strategy
 To prevent "persona drift" and ensure a robust adversarial debate:
 - **Prosecutor**: Focused on strict adherence to best practices; biased toward identifying failures and technical debt.
 - **Defense**: Evaluates mitigating factors (e.g., prototype stage, specific constraints); biased toward project viability.
 - **Tech Lead**: Constrained by pragmatism and "Level 2" implementation feasibility; acts as a deterministic pivot.
+
+### Evidence Aggregator — The Metacognitive Barrier
+Before judges see any evidence, the `EvidenceAggregator` performs cross-referencing to catch hallucinations:
+- **Fact-Check**: Iterates over document claims and matches them against repo evidence per dimension. If the PDF asserts something the code doesn't support, a `ConflictEntry(tag="FACTCHECK", dimension_id=...)` is emitted.
+- **Security Scan**: If the repo evidence mentions unsafe patterns (e.g., `os.system`), a `ConflictEntry(tag="SECURITY", dimension_id="safe_tool_engineering")` is emitted.
+- **Dimension Scoping**: Every conflict is tied to a specific `dimension_id`, so the ChiefJustice can apply penalties to the correct criterion.
+
+### ChiefJustice — Rule-Driven Scoring Pipeline
+The synthesis engine uses a **4-step deterministic pipeline**, not a simple weighted average:
+
+| Step | Rule | Logic |
+| :--- | :--- | :--- |
+| **1. Hard Caps** | `SECURITY` override | If any `ConflictEntry(tag="SECURITY")` exists for a dimension, cap that dimension's score at **3**, regardless of judge opinions. |
+| **1. Hard Caps** | `FACTCHECK` penalty | If any `ConflictEntry(tag="FACTCHECK")` exists for a dimension, set Defense score to **1** (hallucination penalty). |
+| **2. Authoritative Score** | TechLead dominance | For `graph_orchestration`: if TechLead score ≥ 4, TechLead score is the **sole final score** (skip weighted fallback). |
+| **3. Weighted Fallback** | Default scoring | Only when no rule above applies: `score = (TechLead × 0.4) + (Prosecutor × 0.3) + (Defense × 0.3)` |
+| **4. Clamp & Round** | Deterministic output | `Decimal(ROUND_HALF_UP)` → integer 1–5. Avoids Python's banker's rounding (2.5 → 3, not 2). |
+
+**Dissent Requirement**: When `max(all_3_scores) - min(all_3_scores) > 2`, a mandatory `dissent_summary` is generated citing the highest and lowest scoring judges and their arguments.
+
+---
+
+## 📝 Forensic Report Generation
+
+The final output is a structured Markdown file written to `reports/forensic_report.md`.
+
+### Report Structure
+```
+# Forensic Audit Report
+  → Repo URL, Overall Score, Dimension Count
+
+## Executive Summary
+  → High-level findings and conflict count
+
+## Criterion Breakdown (per dimension)
+  → Judge opinions table (Prosecutor | Defense | TechLead)
+  → Dissent note (if variance > 2)
+  → Evidence citations (deduped, sorted, max 5 per criterion)
+  → Remediation (file-level, action + rationale)
+
+## Remediation Plan
+  → Aggregated steps, grouped by severity (lowest score first)
+```
+
+### Report Safety
+- Creates `reports/` directory if missing (`os.makedirs`)
+- Writes with `encoding="utf-8"`
+- All file paths in output are **relative** (portable, no absolute paths)
 
 ### Implementation Status: Roo-Code Ready
 - **Language Agnostic**: The `RepoInvestigator` has been upgraded to scan `.py`, `.ts`, and `.js` files, specifically tailored to identify `StateGraph` and `Arbiter` patterns in the **Roo-Code** repository.
@@ -120,10 +169,25 @@ To ensure "Master Thinker" tier reliability, the auditor implements rigorous saf
 - **Failure Node**: A terminal `failure_node` is reached if zero artifacts are found, providing a descriptive audit abort reason rather than a generic stack trace.
 
 ### 4. Failure Mode Verification
-The system has been validated against common failure scenarios via automated unit tests:
+The system has been validated against common failure scenarios via **17 automated unit tests** (100% pass rate):
 - **Unsafe Code Detection**: Successfully detects and flags `os.system` or `eval` usage in target repositories.
 - **Graceful PDF Ingestion**: Handles missing or corrupted documents without system crash, returning a factual `found: False` evidence object.
 - **Invalid Repo Handling**: Correctly catches `subprocess` errors for invalid Git URLs and classifies them as forensic mismatches.
+
+### 5. ChiefJustice Rule Verification (`test_chief_justice.py`)
+Each deterministic rule in the scoring pipeline is individually tested:
+
+| Test Case | Rule Verified | Assertion |
+| :--- | :--- | :--- |
+| `test_security_override_caps_at_3` | SECURITY hard cap | All judges score 5, but security conflict caps result at ≤ 3 |
+| `test_security_does_not_affect_other_dimensions` | Scoped enforcement | Security penalty only applies to the flagged dimension |
+| `test_fact_supremacy_penalizes_defense` | FACTCHECK penalty | Defense score reduced to 1 when fact-check fails |
+| `test_dissent_required_when_variance_gt_2` | Dissent trigger | Mandatory dissent_summary when score spread > 2 |
+| `test_no_dissent_when_variance_lte_2` | No false dissent | dissent_summary is None when spread ≤ 2 |
+| `test_techlead_authoritative_on_architecture` | Authority rule | TechLead score = final score on graph_orchestration when ≥ 4 |
+| `test_round_half_up` | Decimal rounding | Score 2.5 rounds to 3 (not 2, avoiding banker's rounding) |
+| `test_scores_clamped_1_to_5` | Bounds enforcement | Extreme penalties never push score below 1 |
+| `test_report_contains_required_sections` | Report content | Validates repo URL, score, dissent, citations, and remediation in output |
 
 ## 🏗️ Reproducibility & Professional Infrastructure
 
@@ -141,4 +205,4 @@ The repository is built for seamless reproduction and technical audit.
 - **Flexibility**: The system provides a clean CLI in `main.py` allowing auditors to specify arbitrary target repositories using the `--repo` and `--pdf` flags, moving away from hardcoded configurations.
 
 ---
-*Status: Phases 1-3 Fully Implemented & Verified (Roo-Code Ready) *
+*Status: Phases 1-4 Fully Implemented & Verified — 17/17 Tests Passing (Roo-Code Ready)*
