@@ -44,10 +44,10 @@ def RepoInvestigator(state: AgentState):
     with tempfile.TemporaryDirectory() as tmpdir:
         try:
             # 1. Clone
-            subprocess.run(["git", "clone", "--depth", "1", "--filter=blob:none", repo_url, "."], cwd=tmpdir, check=True, capture_output=True, timeout=600)
+            subprocess.run(["git", "clone", repo_url, "."], cwd=tmpdir, check=True, capture_output=True, timeout=600)
             
             # 2. Extract context for the LLM
-            git_history = str(subprocess.run(["git", "log", "--oneline", "-n", "20"], cwd=tmpdir, capture_output=True).stdout.decode())
+            git_history = str(subprocess.run(["git", "log", "--oneline", "-n", "50"], cwd=tmpdir, capture_output=True).stdout.decode())
             
             # 3. Dynamic Forensic Execution
             for task in tasks:

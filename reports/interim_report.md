@@ -205,3 +205,65 @@ The repository is built for seamless reproduction and technical audit.
 - **Flexibility**: The system provides a clean CLI in `main.py` allowing auditors to specify arbitrary target repositories using the `--repo` and `--pdf` flags, moving away from hardcoded configurations.
 
 ---
+
+## 🎯 Peer Audit Results: Abnet-Melaku1/automation-auditor
+
+### Execution Summary
+
+A live forensic audit was executed against the peer repository [Abnet-Melaku1/automation-auditor](https://github.com/Abnet-Melaku1/automation-auditor) using the full Automaton Auditor pipeline:
+
+```bash
+uv run python main.py \
+  --repo https://github.com/Abnet-Melaku1/automation-auditor \
+  --pdf peer-audit/final_report.pdf
+```
+
+**Overall Score: 3.8 / 5.0** — 9 dimensions evaluated, 2 conflicts detected.
+
+### Per-Dimension Scores
+
+| Dimension | Score | Prosecutor | Defense | TechLead | Notes |
+|-----------|-------|------------|---------|----------|-------|
+| Git Forensic Analysis | ⭐ 5/5 | 5 | 5 | 5 | Unanimous — atomic commits with clear progression |
+| Graph Orchestration Architecture | ⭐ 5/5 | 4 | 5 | 5 | TechLead authority rule applied |
+| Safe Tool Engineering | ⭐ 5/5 | 5 | 5 | 5 | Unanimous — sandboxed `tempfile` + `subprocess.run` |
+| Structured Output Enforcement | ⭐ 5/5 | 5 | 5 | 5 | Unanimous — `.with_structured_output(JudicialOpinion)` |
+| Pydantic State Modeling | ⭐ 4/5 | 4 | 4 | 3 | Slight divergence — TechLead noted BaseModel vs TypedDict |
+| Judicial Nuance and Dialectics | ⭐ 3/5 | 2 | 4 | 4 | Prosecutor flagged shallow persona differentiation |
+| Metacognition & Dialectic Depth | ⭐ 3/5 | 2 | 4 | 4 | ⚠️ Dissent (spread=3) + FACTCHECK conflict |
+| Report Accuracy (Cross-Reference) | ⭐ 3/5 | 3 | 5 | 5 | ⚠️ Dissent (spread=4) + FACTCHECK conflict |
+| Architectural Diagram Analysis | ⭐ 1/5 | 1 | 2 | 1 | No valid LangGraph diagram detected in PDF |
+
+### Evidence Sources
+
+| Source | Items | Key Findings |
+|--------|-------|-------------|
+| **RepoInvestigator** | 6 | All code-level dimensions confirmed with high confidence (0.95) |
+| **DocAnalyst** | 2 | PDF claims for Metacognition and Report Accuracy found but flagged |
+| **VisionInspector** | 1 | Generic diagram detected (confidence: 0.50), not a valid LangGraph diagram |
+
+### Conflicts Detected
+
+Two `FACTCHECK` conflicts were emitted by the `EvidenceAggregator`:
+
+1. **Metacognition & Dialectic Depth**: PDF claims implementation via `decision_engine.py` but the `RepoInvestigator` found no supporting code evidence → Defense overruled (score set to 1) via `fact_supremacy` rule.
+2. **Report Accuracy (Cross-Reference)**: PDF claims verified file paths but `RepoInvestigator` found no corroborating evidence → Defense overruled.
+
+### Key Observations
+
+**Strengths of the Peer Submission:**
+- Excellent git hygiene — atomic, descriptive commits showing clear `Setup → Tools → Graph → Judges` progression
+- Proper dual fan-out/fan-in architecture with `evidence_aggregator` and `judicial_aggregator` synchronization nodes
+- Sandboxed tool engineering with zero `os.system` calls
+- `.with_structured_output()` binding on all Judge LLM calls
+- `Annotated` reducers (`operator.ior`, `operator.add`) for thread-safe state
+
+**Weaknesses Identified:**
+- No architectural diagram in PDF — `VisionInspector` detected only a generic image (not a LangGraph State Machine diagram)
+- Judicial persona prompts could use deeper adversarial differentiation
+- PDF report references files (e.g., `decision_engine.py`) not confirmed in the repo, triggering hallucination penalties
+
+### Full Report
+The complete forensic breakdown is available at [`reports/forensic_report.md`](forensic_report.md).
+
+---
