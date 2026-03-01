@@ -62,6 +62,16 @@ uv run python -m unittest tests/test_forensics.py
 
 ---
 
+## 🔄 Peer Feedback Loop (MinMax Optimization)
+
+This agent was iteratively refined based on deep architectural flaws discovered through cross-agent peer analysis. See [`REFLECTION.md`](REFLECTION.md) for the full breakdown of:
+- **4 critical flaws** uncovered in peer submissions during Week 1
+- **Corresponding detection capabilities** added to this agent in Week 2
+- **Self-guard mechanisms** ensuring every flaw we detect in peers is also prevented in our own code
+- **Commit-trail evidence** linking each fix to a specific peer finding
+
+---
+
 ## 📂 Project Structure
 - `src/graph.py`: The architecture of the LangGraph state machine.
 - `src/state.py`: Pydantic definitions and robust reducers.
@@ -69,3 +79,4 @@ uv run python -m unittest tests/test_forensics.py
 - `src/tools/`: Specialized modules for AST, PDF, and Git analysis.
 - `reports/`: Location for generated forensic audit reports.
 - `tests/`: Forensic test suite with high failure-mode coverage.
+- `REFLECTION.md`: Peer feedback integration and MinMax optimization documentation.
