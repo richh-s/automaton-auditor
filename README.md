@@ -35,7 +35,12 @@ Copy the example environment file and add your credentials:
 ```bash
 cp .env.example .env
 ```
-*Note: Forensic tools use simulated/local logic for certain LLM features but require valid LangSmith keys for full observability.*
+### 4. Docker (Optional)
+The auditor is containerized for forensic isolation. Build and run with:
+```bash
+docker build -t automaton-auditor .
+docker run --env-file .env automaton-auditor --repo <URL> --pdf <PATH>
+```
 
 ---
 
@@ -45,52 +50,52 @@ cp .env.example .env
 The auditor can be executed against any target repository or technical report. If no arguments are provided, it defaults to auditing its own repository.
 
 ```bash
-# General usage
+# General usage via uv
 uv run python main.py --repo <REPO_URL> --pdf <PATH_TO_PDF>
 
 # Example: Auditing an external project
 uv run python main.py \
   --repo https://github.com/langchain-ai/langgraph \
-  --pdf docs/architecture_spec.pdf
+  --pdf reports/architecture_spec.pdf
 ```
 
 ### Running Tests
-To validate the forensic tools and orchestration logic including failure mode handling:
+To validate forensic tools and orchestration:
 ```bash
-uv run python -m unittest tests/test_forensics.py
+uv run pytest tests/
 ```
 
 ---
 
 ## 🔄 Peer Feedback Loop (MinMax Optimization)
 
-This agent was iteratively refined based on deep architectural flaws discovered through cross-agent peer analysis. See [`REFLECTION.md`](REFLECTION.md) for the full breakdown of:
-- **4 critical flaws** uncovered in peer submissions during Week 1
-- **Corresponding detection capabilities** added to this agent in Week 2
-- **Self-guard mechanisms** ensuring every flaw we detect in peers is also prevented in our own code
-- **Commit-trail evidence** linking each fix to a specific peer finding
+This agent was iteratively refined based on peer feedback loops. See [`REFLECTION.md`](REFLECTION.md) for self-guard mechanisms.
 
-### Latest Peer Audit: Abnet-Melaku1/automation-auditor
-A full forensic audit was executed against [Abnet-Melaku1/automation-auditor](https://github.com/Abnet-Melaku1/automation-auditor):
-- **Overall Score: 3.8 / 5.0** across 9 rubric dimensions
-- **4 dimensions scored 5/5** (Git Forensics, Graph Orchestration, Safe Tools, Structured Output)
-- **2 FACTCHECK conflicts detected** — PDF claims not backed by repo evidence
-- Full results in [`reports/forensic_report.md`](reports/forensic_report.md)
+### Audit Results
+Detailed audit reports are organized in the `audit/` directory for submission:
+- **Self-Audit**: [`audit/report_onself_generated/forensic_report.md`](audit/report_onself_generated/forensic_report.md)
+- **Peer-Audit**: [`audit/report_onpeer_generated/forensic_report.md`](audit/report_onpeer_generated/forensic_report.md)
+- **Peer-Received**: [`audit/report_bypeer_received/`](audit/report_bypeer_received/) (Placeholder for peer's audit on this repo)
 
 ---
 
 ## 📂 Project Structure
-- `src/graph.py`: The architecture of the LangGraph state machine.
-- `src/state.py`: Pydantic definitions and robust reducers.
-- `src/nodes/detectives.py`: Implementation of forensic agent nodes.
-- `src/nodes/judges.py`: Judicial persona nodes (Prosecutor, Defense, TechLead, ChiefJustice).
-- `src/tools/`: Specialized modules for AST, PDF, and Git analysis.
-- `reports/`: Generated forensic audit reports.
-  - `forensic_report.md`: Latest peer audit results.
-  - `interim_report.md`: Full architectural and implementation documentation.
-- `peer-audit/`: Cloned peer repository and PDF for audit analysis.
-- `tests/`: Forensic test suite with high failure-mode coverage.
-- `REFLECTION.md`: Peer feedback integration and MinMax optimization documentation.
-- `FORENSIC_REPORT.md`: Self-evaluation forensic report.
+- `src/graph.py`: Complete StateGraph with parallel fan-out/fan-in.
+- `src/state.py`: Finalized state definitions and robust reducers.
+- `src/nodes/`:
+    - `detectives.py`: RepoInvestigator, DocAnalyst, and VisionInspector.
+    - `judges.py`: Prosecutor, Defense, and TechLead personas.
+    - `justice.py`: ChiefJusticeNode with deterministic conflict resolution rules.
+- `src/tools/`:
+    - `repo_tools.py`: AST-based forensic tools for repo analysis.
+    - `doc_tools.py`: PDF parsing and cross-referencing tools.
+    - `vision_tools.py`: Image extraction logic.
+- `audit/`: Submission reports (Self-generated, Peer-generated, Peer-received).
+- `reports/`:
+    - `final_report.pdf`: The official PDF technical report for this project.
+- `pyproject.toml`: Minimal locked dependencies managed via `uv`.
+- `Dockerfile`: Containerized runtime for the auditor.
+- `REFLECTION.md`: Documentation of the MinMax peer feedback loop.
 - `rubric.json`: Machine-readable rubric (9 dimensions, 4 synthesis rules).
+
 
