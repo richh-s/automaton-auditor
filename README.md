@@ -70,13 +70,27 @@ This agent was iteratively refined based on deep architectural flaws discovered 
 - **Self-guard mechanisms** ensuring every flaw we detect in peers is also prevented in our own code
 - **Commit-trail evidence** linking each fix to a specific peer finding
 
+### Latest Peer Audit: Abnet-Melaku1/automation-auditor
+A full forensic audit was executed against [Abnet-Melaku1/automation-auditor](https://github.com/Abnet-Melaku1/automation-auditor):
+- **Overall Score: 3.8 / 5.0** across 9 rubric dimensions
+- **4 dimensions scored 5/5** (Git Forensics, Graph Orchestration, Safe Tools, Structured Output)
+- **2 FACTCHECK conflicts detected** — PDF claims not backed by repo evidence
+- Full results in [`reports/forensic_report.md`](reports/forensic_report.md)
+
 ---
 
 ## 📂 Project Structure
 - `src/graph.py`: The architecture of the LangGraph state machine.
 - `src/state.py`: Pydantic definitions and robust reducers.
 - `src/nodes/detectives.py`: Implementation of forensic agent nodes.
+- `src/nodes/judges.py`: Judicial persona nodes (Prosecutor, Defense, TechLead, ChiefJustice).
 - `src/tools/`: Specialized modules for AST, PDF, and Git analysis.
-- `reports/`: Location for generated forensic audit reports.
+- `reports/`: Generated forensic audit reports.
+  - `forensic_report.md`: Latest peer audit results.
+  - `interim_report.md`: Full architectural and implementation documentation.
+- `peer-audit/`: Cloned peer repository and PDF for audit analysis.
 - `tests/`: Forensic test suite with high failure-mode coverage.
 - `REFLECTION.md`: Peer feedback integration and MinMax optimization documentation.
+- `FORENSIC_REPORT.md`: Self-evaluation forensic report.
+- `rubric.json`: Machine-readable rubric (9 dimensions, 4 synthesis rules).
+
