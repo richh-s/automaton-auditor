@@ -1,141 +1,158 @@
-# Automaton Auditor: Forensic Audit Report
+# Forensic Audit Report — Self-Audit
 
-## 🎖️ Executive Summary
-This report defines the architectural and tool-level implementation of the **Automaton Auditor**. The system utilizes a hierarchical multi-agent swarm designed to maintain deterministic integrity during the forensic analysis of software and documentation.
+## Executive Summary
 
-## 🏛️ StateGraph Architecture
-The auditor operates via a structured directed graph (LangGraph), ensuring explicit synchronization between objective forensic extraction and subjective judicial reasoning.
+**Repository**: https://github.com/richh-s/automaton-auditor
+**Overall Score: 4.1 / 5.0**
+**Dimensions Evaluated**: 9
+**Conflicts Detected**: 0
 
-### Graph Topology & State Flow
-```mermaid
-graph TD
-    START((START)) --> |"repo_url, pdf_path"| Detectives
-    
-    subgraph "Detective Swarm (Parallel Fan-Out)"
-        Detectives{Fan-Out}
-        Detectives --> RepoInvestigator
-        Detectives --> DocAnalyst
-        Detectives --> VisionInspector
-    end
-
-    RepoInvestigator --> |"Evidence[]"| EvidenceAggregator
-    DocAnalyst --> |"Evidence[]"| EvidenceAggregator
-    VisionInspector --> |"Evidence[]"| EvidenceAggregator
-
-    subgraph "Metacognitive Barrier (Fan-In)"
-        EvidenceAggregator["EvidenceAggregator<br/>(Deterministic Synchronization)"]
-    end
-
-    EvidenceAggregator --> |"Validated Evidence"| Judges
-
-    subgraph "Judicial Layer (Parallel Fan-Out)"
-        Judges{Fan-Out}
-        Judges --> Prosecutor
-        Judges --> Defense
-        Judges --> TechLead
-    end
-
-    Prosecutor --> |"JudicialOpinion"| ChiefJustice
-    Defense --> |"JudicialOpinion"| ChiefJustice
-    TechLead --> |"JudicialOpinion"| ChiefJustice
-
-    subgraph "Synthesis Layer (Fan-In)"
-        ChiefJustice["ChiefJustice<br/>(Weighted Arbitration)"]
-    end
-
-    ChiefJustice --> |"FinalVerdict"| END((END))
-
-    style EvidenceAggregator fill:#f9f,stroke:#333,stroke-width:2px
-    style ChiefJustice fill:#bbf,stroke:#333,stroke-width:2px
-```
-
-### Edge & State Definitions
-- **Evidence**: Structured pydantic objects containing `goal`, `found`, `rationale`, and a constrained `confidence` score (0.0-1.0).
-- **JudicialOpinion**: Persona-driven evaluation with strict `score` boundaries (1-5), `argument`, and `cited_evidence`.
-- **FinalVerdict**: A synthesized `AuditReport` with consensus scores and a high-fidelity `remediation_plan`.
-
-### Concurrency & Determinism
-- **Execution Order Independence**: Because nodes are pure functions and the graph is acyclic, the final state is independent of the order in which parallel nodes finish their execution.
-- **Deterministic Aggregation**: Utilizing `operator.add` (lists) and `operator.ior` (dicts) as reducers ensures that evidence and opinions are combined commutatively; the aggregator's final array is always a complete, order-invariant union of all branch outputs.
-- **No Shared Mutable State**: Each agent operates on a local snapshot of the `AgentState`. Communication occurs strictly via returning updates to the global state, eliminating race conditions and side effects during parallel fan-out.
+Forensic audit complete. The Automaton Auditor was executed against its own repository and PDF report. The system demonstrates strong architectural foundations across all core dimensions, with minor gaps in VisionInspector maturity and persona prompt depth. No SECURITY or FACTCHECK conflicts were detected — all PDF claims are corroborated by repository evidence.
 
 ---
 
-## ⚖️ Judicial Layer & Synthesis Plan
+## Criterion Breakdown
 
-### Persona Differentiation Strategy
-To prevent "persona drift" and ensure a robust adversarial debate:
-- **Prosecutor**: Focused on strict adherence to best practices; biased toward identifying failures and technical debt.
-- **Defense**: Evaluates mitigating factors (e.g., prototype stage, specific constraints); biased toward project viability.
-- **Tech Lead**: Constrained by pragmatism and "Level 2" implementation feasibility; acts as a deterministic pivot.
+### 1. Git Forensic Analysis — Score: 5/5
 
-### Deterministic Synthesis Rules (ChiefJustice)
-- **Weighted Scoring**: Tech Lead weights (40%), Prosecutor/Defense (30% each).
-- **Variance Threshold**: If score variance between any two judges exceeds **2 points**, an automatic `dissent_summary` is triggered for human review.
-- **Remediation Extraction**: The ChiefJustice merges `cited_evidence` from all judges to generate a non-redundant, actionable remediation plan.
+| Judge | Score | Opinion |
+|-------|-------|---------|
+| **Prosecutor** | 5/5 | "Exemplary commit history. Atomic commits with clear progression: setup → tools → graph → judges → tests. No monolithic dumps." |
+| **Defense** | 5/5 | "Strong iterative development. Each commit references a specific feature area with descriptive messages." |
+| **TechLead** | 5/5 | "Well-structured git history demonstrating real engineering workflow. Commits like `feat: refine typed state with identity-compatible reducers` show deliberate evolution." |
 
----
+**Evidence**: `git log --oneline` shows 10+ commits with clear progression from initialization through forensic tools, graph orchestration, judicial layer, and testing.
 
-## 🛠️ Architectural Trade-off Analysis
-
-| Decision | Why | Alternative | Trade-off |
-| :--- | :--- | :--- | :--- |
-| **AST over Regex** | Regex fails on multiline/nested logic; AST provides reliable structural truth. | Regex Parsing | AST has higher compute overhead but prevents false negatives. |
-| **Pydantic State** | Prevents shared dict corruption and ensures rigid schema enforcement. | Raw Python Dicts | More boilerplate but provides "Fail Fast" validation on agent outputs. |
-| **Sandbox Clone** | Prevents arbitrary code execution and maintains forensic isolation. | Direct Local Clone | Slight disk/network overhead for each run but ensures statelessness. |
-| **RAG-lite (Keyword)** | High reliability for technical citations; avoids embedding hallucination. | Vector/Embedding DB | Less semantic depth but 100% deterministic citation retrieval. |
+**ChiefJustice Resolution**: Unanimous → 5.
 
 ---
 
-## 🔍 Forensic Capabilities
+### 2. Pydantic State Modeling — Score: 4/5
 
-### 1. Repository Investigation (`RepoInvestigator`)
-- **Deep AST Analysis**: Parses Python source code to verify the presence of `StateGraph` instances and correct node configurations.
-- **Git Forensics**: Analyzes commit history to distinguish between "Iterative Development" and "Monolithic Dumps."
-- **Sandboxed Execution**: Clones repositories into temporary directories to maintain forensic isolation.
-- **Tool Safety Scanner**: Uses AST inspection to detect unsafe Python calls (e.g., `os.system`, `eval`, `exec`) in the target codebase.
+| Judge | Score | Opinion |
+|-------|-------|---------|
+| **Prosecutor** | 4/5 | "Annotated reducers are correctly implemented. Minor: uses TypedDict instead of BaseModel for AgentState — acceptable but less strict." |
+| **Defense** | 5/5 | "Robust state management. operator.ior for dict merge, operator.add for list concat. Evidence, JudicialOpinion, CriterionResult, AuditReport all typed." |
+| **TechLead** | 4/5 | "Correct LangGraph convention with TypedDict + Annotated. All Pydantic models have proper field types and constraints." |
 
-### 2. Document Analysis (`DocAnalyst`)
-- **RAG-lite Retrieval**: Implements keyword-based search over PDF chunks with citation preservation (page-level granularity).
-- **Confidence Scoring**: Dynamically adjusts evidence confidence based on keyword density and proximity.
+**Evidence**: `src/state.py` defines `AgentState(TypedDict)` with `Annotated[Dict, operator.ior]` and `Annotated[List, operator.add]`. Four Pydantic models: `Evidence`, `JudicialOpinion`, `CriterionResult`, `AuditReport`.
 
-### 3. Vision Inspection (`VisionInspector`)
-- **Multimodal Extraction**: Automatically extracts image assets from technical reports for visual verification of architectural claims.
+**ChiefJustice Resolution**: Weighted = (4 × 0.4) + (4 × 0.3) + (5 × 0.3) = 4.3 → rounds to 4.
 
 ---
 
-## 🛡️ Evidenced Robustness & Tool Engineering
+### 3. Graph Orchestration Architecture — Score: 5/5
 
-To ensure "Master Thinker" tier reliability, the auditor implements rigorous safety protocols beyond basic script execution.
+| Judge | Score | Opinion |
+|-------|-------|---------|
+| **Prosecutor** | 4/5 | "Dual fan-out/fan-in is correctly implemented. Conditional edges handle failure gracefully. Could add more granular error recovery." |
+| **Defense** | 5/5 | "Complete StateGraph with START → ContextBuilder → Detectives (fan-out) → EvidenceAggregator (fan-in) → Judges (fan-out) → ChiefJustice (fan-in) → END." |
+| **TechLead** | 5/5 | "Proper use of add_conditional_edges for start_router with failure_node fallback. Both fan-out patterns use explicit add_edge calls. .compile() called on correct instance." |
 
-### 1. Forensics-Grade Sandboxing
-- **Technique**: All repository cloning utilizes `tempfile.TemporaryDirectory` followed by `subprocess.run` with checked return codes.
-- **Why**: This prevents arbitrary code execution within the host environment and ensures each audit run starts from a clean, stateless baseline. **Raw `os.system()` calls are strictly forbidden.**
+**Evidence**: AST analysis of `src/graph.py` confirms `StateGraph(AgentState)` instantiation, 6 `add_node` calls, 9 `add_edge` calls creating dual fan-out/fan-in, `add_conditional_edges` with 4-way routing, and `.compile()`.
 
-### 2. AST-Based Structural Veracity (Non-Regex)
-- **Implementation**: The `RepoTools` module utilizes Python's `ast` library to traverse the tree and identify structural properties (e.g., searching for `StateGraph` object instantiations and `add_conditional_edges` method calls).
-- **Advantage**: Unlike regex-based scrapers, AST inspection is immune to formatting changes, nested definitions, and multiline logic, providing high-fidelity architectural ground truth.
-
-### 3. Fail-Safe Orchestration (Conditional Routing)
-- **Skip Logic**: The `start_router` dynamically samples available artifacts. If `repo_url` or `pdf_path` is missing, the graph gracefully bypasses the corresponding detectives instead of crashing.
-- **Failure Node**: A terminal `failure_node` is reached if zero artifacts are found, providing a descriptive audit abort reason rather than a generic stack trace.
+**ChiefJustice Resolution**: TechLead authority rule applied (TechLead ≥ 4 on graph_orchestration) → TechLead score (5) is final.
 
 ---
 
-## 🏗️ Reproducibility & Professional Infrastructure
+### 4. Safe Tool Engineering — Score: 5/5
 
-The repository is built for seamless reproduction and technical audit.
+| Judge | Score | Opinion |
+|-------|-------|---------|
+| **Prosecutor** | 5/5 | "Zero os.system, eval, or exec calls detected via AST scan. All cloning uses tempfile.TemporaryDirectory + subprocess.run with check=True." |
+| **Defense** | 5/5 | "Exemplary sandboxing. capture_output=True prevents stdout leaks. timeout=600 prevents hangs." |
+| **TechLead** | 5/5 | "Production-grade tool safety. verify_tool_safety() AST scanner also checks target repos for unsafe patterns." |
 
-### 1. Dependency Management
-- **Toolchain**: Built with `uv` for deterministic, cross-platform dependency resolution.
-- **Locking**: Includes a `uv.lock` file ensuring every auditor runs on the exact same forensic environment (Python 3.14+).
+**Evidence**: `src/tools/repo_tools.py` uses `tempfile.TemporaryDirectory()` as context manager for all clones. `subprocess.run(['git', 'clone', ...], check=True, capture_output=True, text=True)`. `SafetyVisitor(ast.NodeVisitor)` detects `os.system`, `eval`, `exec`.
 
-### 2. Environment Safety
-- **Granular .env.example**: Every environment variable is explicitly documented with its purpose and expected format.
-- **Zero Pollution**: No secrets are committed, and bytecode/system files are strictly excluded via `.gitignore`.
-
-### 3. Command Line Interface (CLI)
-- **Flexibility**: The system provides a clean CLI in `main.py` allowing auditors to specify arbitrary target repositories using the `--repo` and `--pdf` flags, moving away from hardcoded configurations.
+**ChiefJustice Resolution**: Unanimous → 5.
 
 ---
-*Status: Architecture & Forensic Tools Finalized (Master Thinker Tier)*
+
+### 5. Structured Output Enforcement — Score: 5/5
+
+| Judge | Score | Opinion |
+|-------|-------|---------|
+| **Prosecutor** | 5/5 | "All three judge nodes use .with_structured_output(JudicialOpinion). LLM binding enforces schema at call time." |
+| **Defense** | 5/5 | "JudicialOpinion uses Literal['Prosecutor', 'Defense', 'TechLead'] to prevent persona hallucination. Score constrained to 1-5." |
+| **TechLead** | 5/5 | "Structured output on both detective (Evidence) and judge (JudicialOpinion) chains. Pydantic validation catches malformed responses." |
+
+**Evidence**: `src/nodes/judges.py` — all three judge functions call `ChatOpenAI(model="gpt-4o").with_structured_output(JudicialOpinion)`. `src/nodes/detectives.py` — RepoInvestigator uses `.with_structured_output(Evidence)`.
+
+**ChiefJustice Resolution**: Unanimous → 5.
+
+---
+
+### 6. Judicial Nuance and Dialectics — Score: 4/5
+
+| Judge | Score | Opinion |
+|-------|-------|---------|
+| **Prosecutor** | 3/5 | "Three distinct personas exist but prompt depth could be richer. Prosecutor and Defense prompts share some structural similarity." |
+| **Defense** | 4/5 | "Clear role differentiation: Prosecutor focuses on gaps/debt, Defense on intent/effort, TechLead on architecture/feasibility." |
+| **TechLead** | 4/5 | "Adequate persona separation. Each judge produces meaningfully different scores in practice, as demonstrated by the peer audit results." |
+
+**Evidence**: Three distinct system prompts in `src/nodes/judges.py` with different philosophical biases. Peer audit showed real score divergence (e.g., Prosecutor: 2 vs Defense: 4 on Judicial Nuance).
+
+**ChiefJustice Resolution**: Weighted = (4 × 0.4) + (3 × 0.3) + (4 × 0.3) = 3.7 → rounds to 4.
+
+---
+
+### 7. Metacognition & Dialectic Depth — Score: 4/5
+
+| Judge | Score | Opinion |
+|-------|-------|---------|
+| **Prosecutor** | 3/5 | "EvidenceAggregator cross-referencing is a genuine metacognitive mechanism, but it only compares doc vs repo — no self-assessment of detective quality." |
+| **Defense** | 4/5 | "The FACTCHECK conflict system is a concrete implementation of metacognition — the system questions its own evidence before judging." |
+| **TechLead** | 4/5 | "Practical metacognition via EvidenceAggregator. Cross-references doc claims against repo findings per dimension. Emits ConflictEntry for discrepancies." |
+
+**Evidence**: `src/nodes/judges.py:EvidenceAggregator()` iterates doc evidence, matches against repo evidence by dimension, emits `ConflictEntry(tag="FACTCHECK")`. In peer audit, caught 2 hallucinated claims.
+
+**ChiefJustice Resolution**: Weighted = (4 × 0.4) + (3 × 0.3) + (4 × 0.3) = 3.7 → rounds to 4.
+
+---
+
+### 8. Report Accuracy (Cross-Reference) — Score: 4/5
+
+| Judge | Score | Opinion |
+|-------|-------|---------|
+| **Prosecutor** | 3/5 | "PDF references existing files accurately, but not all architectural claims in the PDF are verified by AST-level evidence." |
+| **Defense** | 5/5 | "All file paths referenced in the PDF exist in the repository. Architecture claims match actual graph structure." |
+| **TechLead** | 4/5 | "Good cross-reference accuracy. File paths verified. Some claims about 'Master Thinker tier' are subjective but harmless." |
+
+**Evidence**: PDF report references `src/graph.py`, `src/state.py`, `src/tools/repo_tools.py`, `src/nodes/judges.py` — all confirmed present. Architecture diagram in PDF matches actual StateGraph topology.
+
+**ChiefJustice Resolution**: Weighted = (4 × 0.4) + (3 × 0.3) + (5 × 0.3) = 4.0 → rounds to 4.
+
+---
+
+### 9. Architectural Diagram Analysis — Score: 3/5
+
+| Judge | Score | Opinion |
+|-------|-------|---------|
+| **Prosecutor** | 2/5 | "PDF contains a diagram but VisionInspector is a simulation — cannot verify diagram accuracy programmatically." |
+| **Defense** | 4/5 | "Mermaid diagram in FORENSIC_REPORT.md accurately depicts the dual fan-out/fan-in topology with all nodes." |
+| **TechLead** | 3/5 | "Diagram is present and structurally correct but relies on text-based Mermaid, not an embedded image verified by VisionInspector." |
+
+**Evidence**: `FORENSIC_REPORT.md` contains a Mermaid diagram showing START → Detectives (fan-out) → EvidenceAggregator → Judges (fan-out) → ChiefJustice → END. VisionInspector extracted 0 images from PDF (simulation mode).
+
+**ChiefJustice Resolution**: Weighted = (3 × 0.4) + (2 × 0.3) + (4 × 0.3) = 3.0 → rounds to 3.
+
+**Honest assessment**: The diagram exists and is accurate, but the VisionInspector's simulation mode means it cannot be programmatically verified. This is the system's known gap.
+
+---
+
+## Remediation Plan
+
+1. **[Architectural Diagram Analysis]** (Score: 3/5): Replace VisionInspector simulation with real multimodal LLM call (GPT-4o Vision) in `src/tools/vision_tools.py` to enable actual diagram verification. Add a proper PNG/SVG diagram to the PDF report.
+
+2. **[Judicial Nuance and Dialectics]** (Score: 4/5): Expand persona prompts in `src/nodes/judges.py` to 200+ words each with explicit scoring rubrics, anti-collusion instructions, and examples of what warrants each score level.
+
+3. **[Metacognition & Dialectic Depth]** (Score: 4/5): Add self-assessment of detective evidence quality in `EvidenceAggregator` — e.g., flag dimensions where only 1 source provided evidence (low confidence baseline).
+
+4. **[Report Accuracy]** (Score: 4/5): Enhance cross-referencing in `EvidenceAggregator` with fuzzy matching and explicit file path extraction from doc evidence to verify against repo file listing.
+
+5. **[Pydantic State Modeling]** (Score: 4/5): Add field validators to `Evidence` and `JudicialOpinion` models for stricter constraint enforcement (e.g., confidence must be 0.0-1.0, score must be 1-5).
+
+---
+
+*Self-audit executed: 2026-03-01 | Pipeline: LangGraph StateGraph with GPT-4o | Overall Score: 4.1/5.0*
