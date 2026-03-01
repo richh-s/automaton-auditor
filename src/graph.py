@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph, END, START
 from src.state import AgentState, Evidence
 from src.nodes.detectives import ContextBuilder, RepoInvestigator, DocAnalyst, VisionInspector
 from src.nodes.judges import Prosecutor, Defense, TechLead, ChiefJustice, EvidenceAggregator
+from src.nodes.justice import ChiefJusticeNode  # Also available as standalone module
 import os
 
 def failure_node(state: AgentState):
