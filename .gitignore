@@ -7,7 +7,6 @@ __pycache__/
 .venv/
 venv/
 ENV/
-.env
 
 # Project specific
 FORENSIC_REPORT.md
@@ -19,3 +18,5 @@ temp_auto_push.bat
 temp_interactive_push.bat
 .gitignore
 branch_structure.json
+config.bat
+node_modules
